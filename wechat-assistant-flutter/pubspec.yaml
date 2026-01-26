@@ -1,0 +1,47 @@
+name: wechat_assistant_flutter
+description: WeChat video call assistant with auto-answer and voice control
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UI Components
+  cupertino_icons: ^1.0.2
+  
+  # State Management
+  provider: ^6.0.5
+  
+  # WebRTC
+  flutter_webrtc: ^0.9.47
+  
+  # Speech Recognition & TTS
+  speech_to_text: ^6.5.1
+  flutter_tts: ^3.8.5
+  
+  # Permissions
+  permission_handler: ^11.0.1
+  
+  # Local Storage
+  shared_preferences: ^2.2.2
+  
+  # HTTP
+  http: ^1.1.0
+  
+  # Signaling (PeerJS alternative)
+  web_socket_channel: ^2.4.0
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/sounds/

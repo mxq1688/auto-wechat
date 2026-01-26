@@ -1,0 +1,7 @@
+# Assets Directory
+
+将应用资源文件放在此目录：
+- images/ - 图标、图片
+- fonts/ - 自定义字体
+- data/ - 静态数据文件
+

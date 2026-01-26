@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">微信助手</string>
+    <string name="title_activity_main">微信助手</string>
+    <string name="accessibility_service_description">微信助手需要辅助功能权限来读取和回复微信消息</string>
+    <string name="accessibility_service_label">微信助手服务</string>
+</resources>
