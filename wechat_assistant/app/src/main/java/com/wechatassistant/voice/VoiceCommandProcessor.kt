@@ -23,7 +23,7 @@ class VoiceCommandProcessor {
     private val voiceCallKeywords = listOf("语音", "语音通话", "打电话", "通话")
     
     fun parseCommand(voiceInput: String): Command {
-        val input = voiceInput.trim().toLowerCase()
+        val input = voiceInput.trim().lowercase()
         Log.d(TAG, "Parsing: $input")
         
         val commandType = when {

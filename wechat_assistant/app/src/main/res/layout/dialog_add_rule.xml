@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="触发关键词（多个用逗号分隔）"
+        android:textColor="#666666"
+        android:textSize="14sp" />
+
+    <EditText
+        android:id="@+id/editKeywords"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/edit_text_bg"
+        android:hint="例如: 你好, 您好, hi"
+        android:inputType="text"
+        android:padding="12dp"
+        android:textSize="14sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="自动回复内容"
+        android:textColor="#666666"
+        android:textSize="14sp" />
+
+    <EditText
+        android:id="@+id/editReply"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/edit_text_bg"
+        android:hint="例如: 你好，有什么可以帮你的吗？"
+        android:inputType="textMultiLine"
+        android:minLines="2"
+        android:padding="12dp"
+        android:textSize="14sp" />
+
+</LinearLayout>

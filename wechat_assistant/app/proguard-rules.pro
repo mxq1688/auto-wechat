@@ -1,73 +1,62 @@
-# WeChat Assistant ProGuard Rules
+# Add project specific ProGuard rules here.
+# You can control the set of applied configuration files using the
+# proguardFiles setting in build.gradle.
 
-# Keep Android components
--keep public class * extends android.app.Activity
--keep public class * extends android.app.Application
--keep public class * extends android.app.Service
--keep public class * extends android.content.BroadcastReceiver
--keep public class * extends android.content.ContentProvider
--keep public class * extends android.view.View
-
-# Keep Accessibility Service
--keep class com.wechatassistant.accessibility.** { *; }
--keepclassmembers class com.wechatassistant.accessibility.** { *; }
-
-# Keep WebRTC classes
+# 保留 WebRTC 相关类
 -keep class org.webrtc.** { *; }
--keep class com.wechatassistant.webrtc.** { *; }
+-keep class org.webrtc.voiceengine.** { *; }
+-dontwarn org.webrtc.**
 
-# Keep Firebase classes
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
--keep class com.wechatassistant.firebase.** { *; }
+# 保留 OkHttp
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
 
-# Keep data classes
--keepclassmembers class * {
-    @com.google.firebase.firestore.PropertyName <fields>;
+# 保留应用的数据类
+-keep class com.wechatassistant.manager.AutoReplyManager$ReplyRule { *; }
+-keep class com.wechatassistant.manager.MessageMonitor$WeChatMessage { *; }
+-keep class com.wechatassistant.voice.VoiceCommandProcessor$Command { *; }
+
+# 保留枚举
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
 }
 
-# Keep UI classes
--keep class com.wechatassistant.ui.** { *; }
-
-# Keep R class
--keepclassmembers class **.R$* {
-    public static <fields>;
-}
-
-# Kotlin
+# 保留 Kotlin 相关
 -keep class kotlin.** { *; }
 -keep class kotlin.Metadata { *; }
--keepclassmembers class kotlin.Metadata {
-    public <methods>;
-}
+-dontwarn kotlin.**
 -keepclassmembers class **$WhenMappings {
     <fields>;
 }
--keep class kotlinx.coroutines.** { *; }
 
-# Keep attributes
+# 保留 JSON 解析相关
+-keepclassmembers class * {
+    @org.json.* <fields>;
+}
+
+# 保留无障碍服务
+-keep class * extends android.accessibilityservice.AccessibilityService
+
+# 通用规则
 -keepattributes Signature
 -keepattributes *Annotation*
 -keepattributes SourceFile,LineNumberTable
--keepattributes Exceptions
+-renamesourcefileattribute SourceFile
 
-# General Android
+# 保留 Parcelable
 -keepclassmembers class * implements android.os.Parcelable {
-    public static final android.os.Parcelable$Creator *;
+    public static final android.os.Parcelable$Creator CREATOR;
 }
 
+# 保留 Serializable
 -keepclassmembers class * implements java.io.Serializable {
     static final long serialVersionUID;
-    static final java.io.ObjectStreamField[] serialPersistentFields;
+    private static final java.io.ObjectStreamField[] serialPersistentFields;
     private void writeObject(java.io.ObjectOutputStream);
     private void readObject(java.io.ObjectInputStream);
     java.lang.Object writeReplace();
     java.lang.Object readResolve();
-}
-
-# Remove logging
--assumenosideeffects class android.util.Log {
-    public static *** d(...);
-    public static *** v(...);
-    public static *** i(...);
 }
