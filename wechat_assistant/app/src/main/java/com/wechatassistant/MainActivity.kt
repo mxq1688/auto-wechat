@@ -569,6 +569,9 @@ class MainActivity : AppCompatActivity() {
         android.util.Log.d("MainActivity", "toggleVoiceControl: $enabled")
         isVoiceControlEnabled = enabled
         
+        // 更新开关颜色
+        updateVoiceSwitchStyle(enabled)
+        
         if (enabled) {
             // 检查录音权限
             if (!checkAudioPermission()) {
@@ -587,7 +590,7 @@ class MainActivity : AppCompatActivity() {
             }
             
             android.util.Log.d("MainActivity", "Starting voice recognition...")
-            voiceStatusText.text = "🎤 说「给XXX打电话」"
+            voiceStatusText.text = "🎤 语音监听中，说「给XXX打电话」"
             voiceStatusText.setTextColor(0xFF4CAF50.toInt())
             
             if (voiceRecognitionService != null) {
@@ -598,9 +601,24 @@ class MainActivity : AppCompatActivity() {
                 showToast("语音服务初始化失败")
             }
         } else {
-            voiceStatusText.text = "已关闭"
-            voiceStatusText.setTextColor(0xFF888888.toInt())
+            voiceStatusText.text = "⏸️ 语音控制已关闭"
+            voiceStatusText.setTextColor(0xFF9E9E9E.toInt())
             voiceRecognitionService?.stopListening()
+        }
+    }
+    
+    /**
+     * 更新语音开关的样式，让开/关状态更明显
+     */
+    private fun updateVoiceSwitchStyle(enabled: Boolean) {
+        if (enabled) {
+            // 开启状态：绿色
+            switchVoiceControl.thumbTintList = android.content.res.ColorStateList.valueOf(0xFF4CAF50.toInt())
+            switchVoiceControl.trackTintList = android.content.res.ColorStateList.valueOf(0xFFA5D6A7.toInt())
+        } else {
+            // 关闭状态：灰色
+            switchVoiceControl.thumbTintList = android.content.res.ColorStateList.valueOf(0xFFBDBDBD.toInt())
+            switchVoiceControl.trackTintList = android.content.res.ColorStateList.valueOf(0xFFE0E0E0.toInt())
         }
     }
     
