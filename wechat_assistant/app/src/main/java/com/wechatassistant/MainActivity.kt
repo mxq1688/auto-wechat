@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.View
 import android.widget.*
+import android.widget.ImageButton
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -19,10 +20,13 @@ import androidx.core.content.ContextCompat
 import android.content.ComponentName
 import com.wechatassistant.manager.AutoReplyManager
 import com.wechatassistant.manager.SettingsManager
+import com.wechatassistant.service.CoordinatePickerService
 import com.wechatassistant.service.CallNotificationListenerService
 import com.wechatassistant.service.EnhancedWeChatAccessibilityService
 import com.wechatassistant.service.FloatingBallService
+import com.wechatassistant.service.VoiceRecognitionService
 import com.wechatassistant.ui.VideoCallActivity
+import com.wechatassistant.voice.VoiceCommandProcessor
 
 /**
  * 主界面
@@ -38,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     }
     
     private lateinit var settings: SettingsManager
+    private var voiceRecognitionService: VoiceRecognitionService? = null
     
     // Views
     private lateinit var statusText: TextView
@@ -46,6 +51,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var enableServiceButton: Button
     private lateinit var enableNotificationListenerButton: Button
     private lateinit var startFloatingBallButton: Button
+    private lateinit var titleBar: LinearLayout
+    private lateinit var tvTitle: TextView
     private lateinit var switchAutoReply: Switch
     private lateinit var switchAutoAnswer: Switch
     private lateinit var switchTTS: Switch
@@ -56,7 +63,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnSaveSettings: Button
     private lateinit var btnManageRules: Button
     private lateinit var btnTestVideoCall: Button
+    private lateinit var editTargetUserId: EditText
     private lateinit var messageCountText: TextView
+    
+    // 语音控制相关
+    private lateinit var switchVoiceControl: Switch
+    private lateinit var voiceStatusText: TextView
+    private lateinit var contactListContainer: GridLayout
+    private lateinit var tvNoContacts: TextView
     
     private val serviceReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -87,7 +101,11 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun initViews() {
-        // 状态显示
+        // 标题栏
+        titleBar = findViewById(R.id.titleBar)
+        tvTitle = findViewById(R.id.tvTitle)
+        
+        // 状态显示（隐藏的）
         statusText = findViewById(R.id.statusText)
         accessibilityStatusText = findViewById(R.id.accessibilityStatusText)
         notificationListenerStatusText = findViewById(R.id.notificationListenerStatusText)
@@ -110,6 +128,7 @@ class MainActivity : AppCompatActivity() {
         
         // 输入框
         editServerUrl = findViewById(R.id.editServerUrl)
+        editTargetUserId = findViewById(R.id.editTargetUserId)
         editUserId = findViewById(R.id.editUserId)
         
         // 设置点击事件
@@ -136,6 +155,26 @@ class MainActivity : AppCompatActivity() {
         btnTestVideoCall.setOnClickListener {
             testVideoCall()
         }
+        
+        // 语音控制相关
+        switchVoiceControl = findViewById(R.id.switchVoiceControl)
+        voiceStatusText = findViewById(R.id.voiceStatusText)
+        contactListContainer = findViewById(R.id.contactListContainer)
+        tvNoContacts = findViewById(R.id.tvNoContacts)
+        
+        // 加载联系人列表
+        loadContactList()
+        
+        // 右上角设置按钮
+        findViewById<ImageButton>(R.id.btnSettings).setOnClickListener {
+            showSettingsDialog()
+        }
+        
+        switchVoiceControl.setOnCheckedChangeListener { _, isChecked ->
+            toggleVoiceControl(isChecked)
+        }
+        
+        setupVoiceRecognition()
         
         // 开关监听
         switchAutoReply.setOnCheckedChangeListener { _, isChecked ->
@@ -192,6 +231,12 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateStatus()
+        // 刷新联系人列表
+        loadContactList()
+        // 返回界面时恢复语音识别
+        if (isVoiceControlEnabled) {
+            restartListeningIfEnabled()
+        }
     }
     
     private fun updateStatus() {
@@ -221,6 +266,20 @@ class MainActivity : AppCompatActivity() {
         val color = if (isEnabled) "#4CAF50" else "#F44336"
         accessibilityStatusText.text = "无障碍服务: $status"
         accessibilityStatusText.setTextColor(android.graphics.Color.parseColor(color))
+        
+        // 更新标题栏颜色
+        updateTitleBarColor(isEnabled)
+    }
+    
+    private fun updateTitleBarColor(serviceEnabled: Boolean) {
+        val bgColor = if (serviceEnabled) 0xFF4CAF50.toInt() else 0xFFE53935.toInt()  // 绿色 / 红色
+        titleBar.setBackgroundColor(bgColor)
+        
+        // 更新状态栏颜色
+        window.statusBarColor = bgColor
+        
+        // 更新标题文字
+        tvTitle.text = if (serviceEnabled) "微信助手" else "微信助手 (服务未启用)"
     }
     
     private fun updateMessageCount() {
@@ -366,32 +425,27 @@ class MainActivity : AppCompatActivity() {
     
     private fun testVideoCall() {
         val userId = editUserId.text.toString().trim()
+        val targetUserId = editTargetUserId.text.toString().trim()
+        
         if (userId.isEmpty()) {
-            showToast("请先设置用户ID")
+            showToast("请先设置我的ID")
             return
         }
         
-        // 显示输入目标用户ID的对话框
-        val input = EditText(this)
-        input.hint = "输入对方用户ID"
+        if (targetUserId.isEmpty()) {
+            showToast("请输入对方ID")
+            return
+        }
         
-        AlertDialog.Builder(this)
-            .setTitle("发起视频通话")
-            .setView(input)
-            .setPositiveButton("呼叫") { _, _ ->
-                val targetUserId = input.text.toString().trim()
-                if (targetUserId.isNotEmpty()) {
-                    val intent = Intent(this, VideoCallActivity::class.java).apply {
-                        putExtra(VideoCallActivity.EXTRA_TARGET_USER_ID, targetUserId)
-                        putExtra(VideoCallActivity.EXTRA_IS_INCOMING, false)
-                    }
-                    startActivity(intent)
-                } else {
-                    showToast("请输入对方用户ID")
-                }
-            }
-            .setNegativeButton("取消", null)
-            .show()
+        // 保存设置
+        saveSettings()
+        
+        // 发起视频通话
+        val intent = Intent(this, VideoCallActivity::class.java).apply {
+            putExtra(VideoCallActivity.EXTRA_TARGET_USER_ID, targetUserId)
+            putExtra(VideoCallActivity.EXTRA_IS_INCOMING, false)
+        }
+        startActivity(intent)
     }
     
     private fun checkPermissions() {
@@ -437,11 +491,608 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
+    private var isVoiceControlEnabled = false
+    
+    private fun setupVoiceRecognition() {
+        // 初始化语音识别服务
+        voiceRecognitionService = VoiceRecognitionService(this)
+        voiceRecognitionService?.requireWakeWord = false  // 不需要唤醒词，直接说命令
+        
+        voiceRecognitionService?.setCommandListener(object : VoiceRecognitionService.VoiceCommandListener {
+            override fun onCommandRecognized(command: String) {
+                runOnUiThread {
+                    val engineName = voiceRecognitionService?.getCurrentEngineName() ?: ""
+                    voiceStatusText.text = "🎤 [$engineName] 识别到: $command"
+                    voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_blue_light, null))
+                }
+                // 继续监听
+                restartListeningIfEnabled()
+            }
+            
+            override fun onCommandExecuted(command: VoiceCommandProcessor.Command) {
+                runOnUiThread {
+                    val contactName = command.contactName ?: return@runOnUiThread
+                    val callType = if (command.type == VoiceCommandProcessor.CommandType.VIDEO_CALL) "视频" else "语音"
+                    voiceStatusText.text = "📞 正在给${contactName}拨打${callType}电话..."
+                    voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_green_light, null))
+                    
+                    // 执行打电话！
+                    val isVideo = command.type == VoiceCommandProcessor.CommandType.VIDEO_CALL
+                    makeCall(contactName, isVideo)
+                }
+            }
+            
+            override fun onError(error: String) {
+                runOnUiThread {
+                    // 忽略"未识别到语音"错误，继续监听
+                    if (!error.contains("未识别") && !error.contains("超时")) {
+                        voiceStatusText.text = "⚠️ $error"
+                        voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_orange_light, null))
+                    }
+                }
+                // 继续监听
+                restartListeningIfEnabled()
+            }
+            
+            override fun onWakeWordDetected() {
+                runOnUiThread {
+                    voiceStatusText.text = "✨ 小智在听..."
+                    voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_green_light, null))
+                }
+            }
+            
+            override fun onWaitingForCommand() {
+                runOnUiThread {
+                    voiceStatusText.text = "✨ 小智在听，请说命令..."
+                    voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_green_light, null))
+                }
+                // 继续监听等待命令
+                restartListeningIfEnabled()
+            }
+            
+            override fun onModelDownloadProgress(progress: Int) {
+                runOnUiThread {
+                    voiceStatusText.text = "📥 正在下载离线模型: $progress%"
+                    voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_orange_light, null))
+                }
+            }
+            
+            override fun onModelReady() {
+                runOnUiThread {
+                    voiceStatusText.text = "✅ 离线模型已就绪 (Vosk)"
+                    voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_green_light, null))
+                }
+            }
+        })
+    }
+    
+    private fun toggleVoiceControl(enabled: Boolean) {
+        android.util.Log.d("MainActivity", "toggleVoiceControl: $enabled")
+        isVoiceControlEnabled = enabled
+        
+        if (enabled) {
+            // 检查录音权限
+            if (!checkAudioPermission()) {
+                android.util.Log.e("MainActivity", "Audio permission not granted!")
+                switchVoiceControl.isChecked = false
+                return
+            }
+            
+            // 检查无障碍服务
+            if (!EnhancedWeChatAccessibilityService.isServiceRunning()) {
+                android.util.Log.e("MainActivity", "Accessibility service not running!")
+                showToast("需要先启用无障碍服务")
+                switchVoiceControl.isChecked = false
+                showSettingsDialog()  // 直接打开设置
+                return
+            }
+            
+            android.util.Log.d("MainActivity", "Starting voice recognition...")
+            voiceStatusText.text = "🎤 说「给XXX打电话」"
+            voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_green_light, null))
+            
+            if (voiceRecognitionService != null) {
+                voiceRecognitionService?.startListening()
+                android.util.Log.d("MainActivity", "Voice recognition started")
+            } else {
+                android.util.Log.e("MainActivity", "voiceRecognitionService is NULL!")
+                showToast("语音服务初始化失败")
+            }
+        } else {
+            voiceStatusText.text = "语音控制已关闭"
+            voiceStatusText.setBackgroundColor(0xFFE8F5E9.toInt())
+            voiceRecognitionService?.stopListening()
+        }
+    }
+    
+    private fun restartListeningIfEnabled() {
+        if (isVoiceControlEnabled) {
+            // 延迟一小段时间后重新开始监听
+            window.decorView.postDelayed({
+                if (isVoiceControlEnabled) {
+                    runOnUiThread {
+                        voiceStatusText.text = "🎤 说「给XXX打电话」"
+                        voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_green_light, null))
+                    }
+                    voiceRecognitionService?.startListening()
+                }
+            }, 1000)
+        }
+    }
+    
+    private fun checkAudioPermission(): Boolean {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) 
+            != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                PERMISSION_REQUEST_CODE
+            )
+            showToast("请授予录音权限")
+            return false
+        }
+        return true
+    }
+    
+    /**
+     * 加载联系人列表显示在首页
+     */
+    private fun loadContactList() {
+        contactListContainer.removeAllViews()
+        
+        val contacts = settings.getContacts()
+        val contactPhotos = settings.getContactPhotos()
+        
+        if (contacts.isEmpty()) {
+            tvNoContacts.visibility = View.VISIBLE
+            return
+        }
+        
+        tvNoContacts.visibility = View.GONE
+        
+        // 转换 dp 到 px
+        val density = resources.displayMetrics.density
+        val photoSize = (140 * density).toInt()  // 140dp 大圆形照片
+        val itemMargin = (16 * density).toInt()
+        
+        // 计算列数（屏幕宽度 / 单个项目宽度）
+        val screenWidth = resources.displayMetrics.widthPixels
+        val itemTotalWidth = photoSize + itemMargin * 2
+        val columnCount = maxOf(2, (screenWidth - itemMargin) / itemTotalWidth)
+        contactListContainer.columnCount = columnCount
+        
+        contacts.forEach { (wechatName, _) ->
+            // 联系人容器（垂直：圆形照片 + 名字）
+            val contactItem = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER
+                val params = GridLayout.LayoutParams().apply {
+                    width = GridLayout.LayoutParams.WRAP_CONTENT
+                    height = GridLayout.LayoutParams.WRAP_CONTENT
+                    setMargins(itemMargin, itemMargin, itemMargin, itemMargin)
+                }
+                layoutParams = params
+            }
+            
+            // 圆形头像容器
+            val photoContainer = android.widget.FrameLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(photoSize, photoSize)
+                // 圆形裁剪
+                clipToOutline = true
+                outlineProvider = object : android.view.ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: android.graphics.Outline) {
+                        outline.setOval(0, 0, view.width, view.height)
+                    }
+                }
+            }
+            
+            // 圆形头像
+            val photoView = ImageView(this).apply {
+                layoutParams = android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setBackgroundColor(0xFFE0E0E0.toInt())
+                
+                val photoPath = contactPhotos[wechatName]
+                if (photoPath != null && java.io.File(photoPath).exists()) {
+                    val bitmap = android.graphics.BitmapFactory.decodeFile(photoPath)
+                    setImageBitmap(bitmap)
+                } else {
+                    // 默认头像 - 显示首字母
+                    setBackgroundColor(0xFF4CAF50.toInt())
+                }
+            }
+            
+            photoContainer.addView(photoView)
+            
+            // 如果没有照片，显示名字首字母
+            val photoPath = contactPhotos[wechatName]
+            if (photoPath == null || !java.io.File(photoPath).exists()) {
+                val initialView = TextView(this).apply {
+                    text = wechatName.firstOrNull()?.toString() ?: "?"
+                    textSize = 48f
+                    setTextColor(0xFFFFFFFF.toInt())
+                    gravity = android.view.Gravity.CENTER
+                    layoutParams = android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                }
+                photoContainer.addView(initialView)
+            }
+            
+            // 名字标签
+            val nameView = TextView(this).apply {
+                text = wechatName
+                textSize = 16f
+                setTextColor(0xFF333333.toInt())
+                gravity = android.view.Gravity.CENTER
+                setPadding(0, (8 * density).toInt(), 0, 0)
+                maxLines = 1
+                maxWidth = photoSize
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            }
+            
+            contactItem.addView(photoContainer)
+            contactItem.addView(nameView)
+            
+            // 点击拨打视频
+            contactItem.setOnClickListener {
+                makeCall(wechatName, isVideo = true)
+            }
+            
+            // 长按拨打语音
+            contactItem.setOnLongClickListener {
+                makeCall(wechatName, isVideo = false)
+                showToast("正在拨打语音电话...")
+                true
+            }
+            
+            contactListContainer.addView(contactItem)
+        }
+    }
+    
+    private fun makeCall(contactName: String, isVideo: Boolean) {
+        android.util.Log.d("MainActivity", "makeCall: contact=$contactName, isVideo=$isVideo")
+        
+        val serviceRunning = EnhancedWeChatAccessibilityService.isServiceRunning()
+        val serviceInstance = EnhancedWeChatAccessibilityService.instance
+        android.util.Log.d("MainActivity", "Service running: $serviceRunning, instance: $serviceInstance")
+        
+        if (!serviceRunning) {
+            android.util.Log.e("MainActivity", "Accessibility service not running!")
+            showToast("请先启用辅助功能服务")
+            return
+        }
+        
+        val callType = if (isVideo) "视频" else "语音"
+        voiceStatusText.text = "正在给${contactName}拨打${callType}电话..."
+        
+        android.util.Log.d("MainActivity", "Calling service directly...")
+        
+        // 直接调用服务方法（更可靠）
+        EnhancedWeChatAccessibilityService.instance?.startMakeCall(contactName, isVideo)
+    }
+    
+    override fun onPause() {
+        super.onPause()
+        // 离开界面时暂停语音识别
+        if (isVoiceControlEnabled) {
+            voiceRecognitionService?.stopListening()
+        }
+    }
+    
     override fun onDestroy() {
+        isVoiceControlEnabled = false
+        voiceRecognitionService?.destroy()
         super.onDestroy()
         try {
             unregisterReceiver(serviceReceiver)
         } catch (e: Exception) {}
+    }
+    
+    private fun showSettingsDialog() {
+        // 跳转到设置页面
+        startActivity(Intent(this, com.wechatassistant.ui.SettingsActivity::class.java))
+    }
+    
+    private fun showKeywordSettingsDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_keywords_settings, null)
+        
+        // 数据列表 - 新格式：Map<微信名, MutableList<简称>>
+        val contactsMap = settings.getContacts().mapValues { it.value.toMutableList() }.toMutableMap()
+        val wakeWordList = settings.getWakeWords().toMutableList()
+        val videoKeywordList = settings.getVideoCallKeywords().toMutableList()
+        val voiceKeywordList = settings.getVoiceCallKeywords().toMutableList()
+        val generalKeywordList = settings.getGeneralCallKeywords().toMutableList()
+        
+        // 容器
+        val contactListContainer = dialogView.findViewById<LinearLayout>(R.id.contactListContainer)
+        val wakeWordListContainer = dialogView.findViewById<LinearLayout>(R.id.wakeWordListContainer)
+        val videoKeywordListContainer = dialogView.findViewById<LinearLayout>(R.id.videoKeywordListContainer)
+        val voiceKeywordListContainer = dialogView.findViewById<LinearLayout>(R.id.voiceKeywordListContainer)
+        val generalKeywordListContainer = dialogView.findViewById<LinearLayout>(R.id.generalKeywordListContainer)
+        
+        // 输入框
+        val editNewWechatName = dialogView.findViewById<EditText>(R.id.editNewWechatName)
+        val editNewWakeWord = dialogView.findViewById<EditText>(R.id.editNewWakeWord)
+        val editNewVideoKeyword = dialogView.findViewById<EditText>(R.id.editNewVideoKeyword)
+        val editNewVoiceKeyword = dialogView.findViewById<EditText>(R.id.editNewVoiceKeyword)
+        val editNewGeneralKeyword = dialogView.findViewById<EditText>(R.id.editNewGeneralKeyword)
+        
+        // 按钮
+        val btnAddContact = dialogView.findViewById<Button>(R.id.btnAddContact)
+        val btnAddWakeWord = dialogView.findViewById<Button>(R.id.btnAddWakeWord)
+        val btnAddVideoKeyword = dialogView.findViewById<Button>(R.id.btnAddVideoKeyword)
+        val btnAddVoiceKeyword = dialogView.findViewById<Button>(R.id.btnAddVoiceKeyword)
+        val btnAddGeneralKeyword = dialogView.findViewById<Button>(R.id.btnAddGeneralKeyword)
+        val btnToggleAdvanced = dialogView.findViewById<Button>(R.id.btnToggleAdvanced)
+        val advancedSettingsContainer = dialogView.findViewById<LinearLayout>(R.id.advancedSettingsContainer)
+        
+        val checkRequireWakeWord = dialogView.findViewById<CheckBox>(R.id.checkRequireWakeWord)
+        checkRequireWakeWord.isChecked = settings.requireWakeWord
+        
+        // 刷新联系人列表显示
+        fun refreshContactList() {
+            contactListContainer.removeAllViews()
+            
+            if (contactsMap.isEmpty()) {
+                val emptyView = TextView(this).apply {
+                    text = "暂无联系人，请在下方添加"
+                    textSize = 13f
+                    setTextColor(0xFF999999.toInt())
+                    setPadding(8, 12, 8, 12)
+                }
+                contactListContainer.addView(emptyView)
+                return
+            }
+            
+            contactsMap.forEach { (wechatName, aliases) ->
+                // 联系人卡片
+                val cardView = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setBackgroundColor(0xFFFFFFFF.toInt())
+                    setPadding(12, 10, 12, 10)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = 8 }
+                }
+                
+                // 头部：微信名 + 删除按钮
+                val headerRow = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                }
+                
+                val nameView = TextView(this).apply {
+                    text = "📱 $wechatName"
+                    textSize = 15f
+                    setTextColor(0xFF1976D2.toInt())
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                
+                val deleteContactBtn = TextView(this).apply {
+                    text = "删除"
+                    textSize = 12f
+                    setTextColor(0xFFE53935.toInt())
+                    setPadding(16, 4, 0, 4)
+                    setOnClickListener {
+                        contactsMap.remove(wechatName)
+                        refreshContactList()
+                    }
+                }
+                
+                headerRow.addView(nameView)
+                headerRow.addView(deleteContactBtn)
+                cardView.addView(headerRow)
+                
+                // 简称标签区域
+                val aliasContainer = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = 6 }
+                }
+                
+                // 添加简称标签
+                aliases.forEach { alias ->
+                    val tag = TextView(this).apply {
+                        text = "  $alias  ×"
+                        textSize = 12f
+                        setTextColor(0xFFFFFFFF.toInt())
+                        setBackgroundColor(0xFF42A5F5.toInt())
+                        setPadding(10, 4, 10, 4)
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { marginEnd = 6 }
+                        setOnClickListener {
+                            aliases.remove(alias)
+                            if (aliases.isEmpty()) {
+                                contactsMap.remove(wechatName)
+                            }
+                            refreshContactList()
+                        }
+                    }
+                    aliasContainer.addView(tag)
+                }
+                
+                cardView.addView(aliasContainer)
+                
+                // 添加简称输入区
+                val addAliasRow = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = 6 }
+                }
+                
+                val aliasInput = EditText(this).apply {
+                    hint = "添加简称..."
+                    textSize = 13f
+                    setPadding(8, 6, 8, 6)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    setBackgroundColor(0xFFF5F5F5.toInt())
+                }
+                
+                val addAliasBtn = TextView(this).apply {
+                    text = " +添加 "
+                    textSize = 12f
+                    setTextColor(0xFF4CAF50.toInt())
+                    setPadding(12, 6, 4, 6)
+                    setOnClickListener {
+                        val newAlias = aliasInput.text.toString().trim()
+                        if (newAlias.isNotEmpty() && !aliases.contains(newAlias)) {
+                            aliases.add(newAlias)
+                            aliasInput.text.clear()
+                            refreshContactList()
+                        }
+                    }
+                }
+                
+                addAliasRow.addView(aliasInput)
+                addAliasRow.addView(addAliasBtn)
+                cardView.addView(addAliasRow)
+                
+                contactListContainer.addView(cardView)
+            }
+        }
+        
+        // 创建标签的函数
+        fun createTagView(container: LinearLayout, list: MutableList<String>, text: String, bgColor: Int) {
+            val tag = TextView(this).apply {
+                this.text = "  $text  ×"
+                textSize = 12f
+                setTextColor(0xFFFFFFFF.toInt())
+                setBackgroundColor(bgColor)
+                setPadding(12, 6, 12, 6)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginEnd = 8; bottomMargin = 4 }
+                setOnClickListener {
+                    list.remove(text)
+                    container.removeView(this)
+                }
+            }
+            container.addView(tag)
+        }
+        
+        fun refreshTagList(container: LinearLayout, list: MutableList<String>, bgColor: Int) {
+            container.removeAllViews()
+            list.forEach { createTagView(container, list, it, bgColor) }
+        }
+        
+        // 初始化列表显示
+        refreshContactList()
+        refreshTagList(wakeWordListContainer, wakeWordList, 0xFFFF9800.toInt())
+        refreshTagList(videoKeywordListContainer, videoKeywordList, 0xFF2196F3.toInt())
+        refreshTagList(voiceKeywordListContainer, voiceKeywordList, 0xFF4CAF50.toInt())
+        refreshTagList(generalKeywordListContainer, generalKeywordList, 0xFFFF9800.toInt())
+        
+        // 添加新联系人（微信名）
+        btnAddContact.setOnClickListener {
+            val wechatName = editNewWechatName.text.toString().trim()
+            if (wechatName.isNotEmpty()) {
+                if (!contactsMap.containsKey(wechatName)) {
+                    // 新联系人，默认添加微信名本身作为第一个简称
+                    contactsMap[wechatName] = mutableListOf(wechatName)
+                    refreshContactList()
+                    editNewWechatName.text.clear()
+                } else {
+                    showToast("该联系人已存在")
+                }
+            } else {
+                showToast("请输入微信名")
+            }
+        }
+        
+        // 添加唤醒词
+        btnAddWakeWord.setOnClickListener {
+            val word = editNewWakeWord.text.toString().trim()
+            if (word.isNotEmpty() && !wakeWordList.contains(word)) {
+                wakeWordList.add(word)
+                createTagView(wakeWordListContainer, wakeWordList, word, 0xFFFF9800.toInt())
+                editNewWakeWord.text.clear()
+            }
+        }
+        
+        // 添加视频关键词
+        btnAddVideoKeyword.setOnClickListener {
+            val word = editNewVideoKeyword.text.toString().trim()
+            if (word.isNotEmpty() && !videoKeywordList.contains(word)) {
+                videoKeywordList.add(word)
+                createTagView(videoKeywordListContainer, videoKeywordList, word, 0xFF2196F3.toInt())
+                editNewVideoKeyword.text.clear()
+            }
+        }
+        
+        // 添加语音关键词
+        btnAddVoiceKeyword.setOnClickListener {
+            val word = editNewVoiceKeyword.text.toString().trim()
+            if (word.isNotEmpty() && !voiceKeywordList.contains(word)) {
+                voiceKeywordList.add(word)
+                createTagView(voiceKeywordListContainer, voiceKeywordList, word, 0xFF4CAF50.toInt())
+                editNewVoiceKeyword.text.clear()
+            }
+        }
+        
+        // 添加通用关键词
+        btnAddGeneralKeyword.setOnClickListener {
+            val word = editNewGeneralKeyword.text.toString().trim()
+            if (word.isNotEmpty() && !generalKeywordList.contains(word)) {
+                generalKeywordList.add(word)
+                createTagView(generalKeywordListContainer, generalKeywordList, word, 0xFFFF9800.toInt())
+                editNewGeneralKeyword.text.clear()
+            }
+        }
+        
+        // 展开/折叠高级设置
+        btnToggleAdvanced.setOnClickListener {
+            if (advancedSettingsContainer.visibility == View.GONE) {
+                advancedSettingsContainer.visibility = View.VISIBLE
+                btnToggleAdvanced.text = "收起"
+            } else {
+                advancedSettingsContainer.visibility = View.GONE
+                btnToggleAdvanced.text = "展开"
+            }
+        }
+        
+        AlertDialog.Builder(this)
+            .setTitle("语音设置")
+            .setView(dialogView)
+            .setPositiveButton("保存") { _, _ ->
+                // 保存联系人（新格式）
+                settings.setContacts(contactsMap)
+                // 保存唤醒词
+                settings.setWakeWords(wakeWordList.toSet())
+                settings.requireWakeWord = checkRequireWakeWord.isChecked
+                // 保存关键词
+                settings.setVideoCallKeywords(videoKeywordList.toSet())
+                settings.setVoiceCallKeywords(voiceKeywordList.toSet())
+                settings.setGeneralCallKeywords(generalKeywordList.toSet())
+                
+                voiceRecognitionService?.requireWakeWord = checkRequireWakeWord.isChecked
+                showToast("设置已保存")
+            }
+            .setNegativeButton("取消", null)
+            .setNeutralButton("恢复默认") { _, _ ->
+                settings.setWakeWords(SettingsManager.DEFAULT_WAKE_WORDS)
+                settings.requireWakeWord = false
+                settings.setVideoCallKeywords(SettingsManager.DEFAULT_VIDEO_KEYWORDS)
+                settings.setVoiceCallKeywords(SettingsManager.DEFAULT_VOICE_KEYWORDS)
+                settings.setGeneralCallKeywords(SettingsManager.DEFAULT_GENERAL_KEYWORDS)
+                settings.setContactAliases("")
+                showToast("已恢复默认")
+            }
+            .show()
     }
     
     private fun showToast(message: String) {

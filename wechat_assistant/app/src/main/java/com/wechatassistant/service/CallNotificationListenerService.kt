@@ -163,12 +163,20 @@ class CallNotificationListenerService : NotificationListenerService() {
                     }
                 }
             } else {
-                Log.d(TAG, "No notification actions found")
+                Log.d(TAG, "No notification actions found, trying alternative methods...")
                 
-                // 方法2: 尝试点击通知本身
+                // 方法2: 先点击通知打开通话界面
                 try {
                     notification.contentIntent?.send()
-                    Log.d(TAG, "Clicked notification content intent")
+                    Log.d(TAG, "Clicked notification to open call screen")
+                    
+                    // 方法3: 快速发送广播让无障碍服务执行手势点击
+                    handler.postDelayed({
+                        Log.d(TAG, "Sending gesture click broadcast to accessibility service")
+                        val intent = Intent(EnhancedWeChatAccessibilityService.ACTION_GESTURE_CLICK_ACCEPT)
+                        sendBroadcast(intent)
+                    }, 300) // 快速响应
+                    
                 } catch (e: Exception) {
                     Log.e(TAG, "Error clicking notification", e)
                 }

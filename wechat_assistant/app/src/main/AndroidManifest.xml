@@ -18,6 +18,22 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
+    <!-- Android 11+ 包可见性声明 -->
+    <queries>
+        <package android:name="com.tencent.mm" />
+        <!-- 语音识别服务 -->
+        <package android:name="com.iflytek.speechsuite" />
+        <package android:name="com.heytap.speechassist" />
+        <package android:name="com.google.android.googlequicksearchbox" />
+        <!-- 语音识别 Intent -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -30,7 +46,8 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.WeChatAssistant.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -42,6 +59,16 @@
             android:name=".ui.VideoCallActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"
             android:screenOrientation="portrait"
+            android:theme="@style/Theme.WeChatAssistant.NoActionBar" />
+        
+        <!-- 语音设置界面 -->
+        <activity
+            android:name=".ui.VoiceSettingsActivity"
+            android:theme="@style/Theme.WeChatAssistant.NoActionBar" />
+        
+        <!-- 设置界面 -->
+        <activity
+            android:name=".ui.SettingsActivity"
             android:theme="@style/Theme.WeChatAssistant.NoActionBar" />
         
         <!-- 增强版无障碍服务 -->
@@ -74,6 +101,22 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+        
+        <!-- 坐标采集服务 -->
+        <service
+            android:name=".service.CoordinatePickerService"
+            android:exported="false" />
+        
+        <!-- FileProvider 用于拍照 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
             
     </application>
 </manifest>

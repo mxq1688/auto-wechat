@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="@drawable/panel_background">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="📍 坐标采集工具"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:id="@+id/coordText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="点击按钮后，再点击目标位置"
+        android:textColor="#CCCCCC"
+        android:textSize="12sp"
+        android:layout_marginBottom="8dp" />
+
+    <!-- 第一行: 搜索 输入框 粘贴 -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnPickSearch"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="① 搜索"
+            android:textSize="11sp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="8dp" />
+
+        <Button
+            android:id="@+id/btnPickInput"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="② 输入框"
+            android:textSize="11sp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="8dp"
+            android:layout_marginStart="4dp" />
+
+        <Button
+            android:id="@+id/btnPickPaste"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="③ 粘贴"
+            android:textSize="11sp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="8dp"
+            android:layout_marginStart="4dp" />
+    </LinearLayout>
+
+    <!-- 第二行: 结果 加号 视频 -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="4dp">
+
+        <Button
+            android:id="@+id/btnPickResult"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="④ 结果"
+            android:textSize="11sp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="8dp" />
+
+        <Button
+            android:id="@+id/btnPickPlus"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="⑤ 加号"
+            android:textSize="11sp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="8dp"
+            android:layout_marginStart="4dp" />
+
+        <Button
+            android:id="@+id/btnPickVideo"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="⑥ 视频"
+            android:textSize="11sp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="8dp"
+            android:layout_marginStart="4dp" />
+    </LinearLayout>
+
+    <!-- 第三行: 视频通话确认 语音通话确认 -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="4dp">
+
+        <Button
+            android:id="@+id/btnPickConfirmVideo"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="⑦ 确认视频"
+            android:textSize="11sp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="8dp"
+            android:backgroundTint="#00BCD4" />
+
+        <Button
+            android:id="@+id/btnPickConfirmVoice"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="⑧ 确认语音"
+            android:textSize="11sp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="8dp"
+            android:layout_marginStart="4dp"
+            android:backgroundTint="#8BC34A" />
+    </LinearLayout>
+
+    <!-- 保存和关闭 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="12dp">
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="40dp"
+            android:text="💾 保存"
+            android:textSize="12sp"
+            android:backgroundTint="#4CAF50" />
+
+        <Button
+            android:id="@+id/btnClose"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="40dp"
+            android:text="❌ 关闭"
+            android:textSize="12sp"
+            android:backgroundTint="#F44336"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+
+</LinearLayout>

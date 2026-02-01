@@ -50,6 +50,29 @@ class SettingsManager private constructor(context: Context) {
         const val KEY_BLACKLIST = "blacklist"
         const val KEY_USE_WHITELIST = "use_whitelist"
         
+        // 语音命令关键词设置
+        const val KEY_VIDEO_CALL_KEYWORDS = "video_call_keywords"
+        const val KEY_VOICE_CALL_KEYWORDS = "voice_call_keywords"
+        const val KEY_GENERAL_CALL_KEYWORDS = "general_call_keywords"
+        const val KEY_WAKE_WORDS = "wake_words"
+        const val KEY_REQUIRE_WAKE_WORD = "require_wake_word"
+        
+        // 联系人别名设置（格式：别名1=微信名1,别名2=微信名2）
+        const val KEY_CONTACT_ALIASES = "contact_aliases"
+        // 联系人照片（格式：微信名=照片路径）
+        const val KEY_CONTACT_PHOTOS = "contact_photos"
+        
+        // 默认关键词
+        val DEFAULT_VIDEO_KEYWORDS = setOf("视频", "视频通话", "视频电话", "打视频")
+        val DEFAULT_VOICE_KEYWORDS = setOf("语音", "语音通话")
+        val DEFAULT_GENERAL_KEYWORDS = setOf("打电话", "通话", "打个电话", "呼叫", "联系")
+        val DEFAULT_WAKE_WORDS = setOf("小智", "小志", "小知")
+        
+        // 默认联系人（微信名 -> 别名列表）
+        val DEFAULT_CONTACTS = mapOf(
+            "大强" to listOf("小强", "强", "大孙", "大孙的", "大孙子")
+        )
+        
         @Volatile
         private var INSTANCE: SettingsManager? = null
         
@@ -213,6 +236,193 @@ class SettingsManager private constructor(context: Context) {
         }
         
         return true
+    }
+    
+    // ==================== 语音命令关键词设置 ====================
+    
+    var requireWakeWord: Boolean
+        get() = prefs.getBoolean(KEY_REQUIRE_WAKE_WORD, false)
+        set(value) = prefs.edit().putBoolean(KEY_REQUIRE_WAKE_WORD, value).apply()
+    
+    fun getVideoCallKeywords(): Set<String> {
+        return prefs.getStringSet(KEY_VIDEO_CALL_KEYWORDS, DEFAULT_VIDEO_KEYWORDS) ?: DEFAULT_VIDEO_KEYWORDS
+    }
+    
+    fun setVideoCallKeywords(keywords: Set<String>) {
+        prefs.edit().putStringSet(KEY_VIDEO_CALL_KEYWORDS, keywords).apply()
+    }
+    
+    fun getVoiceCallKeywords(): Set<String> {
+        return prefs.getStringSet(KEY_VOICE_CALL_KEYWORDS, DEFAULT_VOICE_KEYWORDS) ?: DEFAULT_VOICE_KEYWORDS
+    }
+    
+    fun setVoiceCallKeywords(keywords: Set<String>) {
+        prefs.edit().putStringSet(KEY_VOICE_CALL_KEYWORDS, keywords).apply()
+    }
+    
+    fun getGeneralCallKeywords(): Set<String> {
+        return prefs.getStringSet(KEY_GENERAL_CALL_KEYWORDS, DEFAULT_GENERAL_KEYWORDS) ?: DEFAULT_GENERAL_KEYWORDS
+    }
+    
+    fun setGeneralCallKeywords(keywords: Set<String>) {
+        prefs.edit().putStringSet(KEY_GENERAL_CALL_KEYWORDS, keywords).apply()
+    }
+    
+    fun getWakeWords(): Set<String> {
+        return prefs.getStringSet(KEY_WAKE_WORDS, DEFAULT_WAKE_WORDS) ?: DEFAULT_WAKE_WORDS
+    }
+    
+    fun setWakeWords(words: Set<String>) {
+        prefs.edit().putStringSet(KEY_WAKE_WORDS, words).apply()
+    }
+    
+    // ==================== 联系人别名设置 ====================
+    
+    /**
+     * 获取联系人列表
+     * 格式：Map<微信名, List<简称>>
+     * 存储格式：微信名:简称1|简称2,微信名2:简称3|简称4
+     */
+    fun getContacts(): Map<String, List<String>> {
+        val contactString = prefs.getString(KEY_CONTACT_ALIASES, "") ?: ""
+        if (contactString.isEmpty()) {
+            // 返回默认联系人
+            return DEFAULT_CONTACTS
+        }
+        
+        val result = mutableMapOf<String, List<String>>()
+        contactString.split(",").forEach { entry ->
+            val parts = entry.trim().split(":")
+            if (parts.size == 2) {
+                val wechatName = parts[0].trim()
+                val aliases = parts[1].split("|").map { it.trim() }.filter { it.isNotEmpty() }
+                if (wechatName.isNotEmpty() && aliases.isNotEmpty()) {
+                    result[wechatName] = aliases
+                }
+            }
+        }
+        return result
+    }
+    
+    /**
+     * 保存联系人列表
+     */
+    fun setContacts(contacts: Map<String, List<String>>) {
+        val contactString = contacts.entries
+            .filter { it.key.isNotEmpty() && it.value.isNotEmpty() }
+            .joinToString(",") { "${it.key}:${it.value.joinToString("|")}" }
+        prefs.edit().putString(KEY_CONTACT_ALIASES, contactString).apply()
+    }
+    
+    /**
+     * 获取联系人别名映射（简称 -> 微信名，用于匹配）
+     */
+    fun getContactAliases(): Map<String, String> {
+        val contacts = getContacts()
+        val result = mutableMapOf<String, String>()
+        contacts.forEach { (wechatName, aliases) ->
+            aliases.forEach { alias ->
+                result[alias] = wechatName
+            }
+            // 微信名本身也作为别名
+            result[wechatName] = wechatName
+        }
+        return result
+    }
+    
+    /**
+     * 设置联系人别名（旧格式兼容）
+     */
+    fun setContactAliases(aliasString: String) {
+        prefs.edit().putString(KEY_CONTACT_ALIASES, aliasString).apply()
+    }
+    
+    // ==================== 联系人照片设置 ====================
+    
+    /**
+     * 获取所有联系人照片
+     * 格式：Map<微信名, 照片路径>
+     */
+    fun getContactPhotos(): Map<String, String> {
+        val photoString = prefs.getString(KEY_CONTACT_PHOTOS, "") ?: ""
+        if (photoString.isEmpty()) return emptyMap()
+        
+        val result = mutableMapOf<String, String>()
+        photoString.split(",").forEach { entry ->
+            val parts = entry.trim().split("=")
+            if (parts.size == 2) {
+                val name = parts[0].trim()
+                val path = parts[1].trim()
+                if (name.isNotEmpty() && path.isNotEmpty()) {
+                    result[name] = path
+                }
+            }
+        }
+        return result
+    }
+    
+    /**
+     * 获取单个联系人的照片路径
+     */
+    fun getContactPhoto(wechatName: String): String? {
+        return getContactPhotos()[wechatName]
+    }
+    
+    /**
+     * 设置联系人照片
+     */
+    fun setContactPhoto(wechatName: String, photoPath: String) {
+        val photos = getContactPhotos().toMutableMap()
+        photos[wechatName] = photoPath
+        saveContactPhotos(photos)
+    }
+    
+    /**
+     * 删除联系人照片
+     */
+    fun removeContactPhoto(wechatName: String) {
+        val photos = getContactPhotos().toMutableMap()
+        photos.remove(wechatName)
+        saveContactPhotos(photos)
+    }
+    
+    /**
+     * 保存所有联系人照片
+     */
+    private fun saveContactPhotos(photos: Map<String, String>) {
+        val photoString = photos.entries
+            .filter { it.key.isNotEmpty() && it.value.isNotEmpty() }
+            .joinToString(",") { "${it.key}=${it.value}" }
+        prefs.edit().putString(KEY_CONTACT_PHOTOS, photoString).apply()
+    }
+    
+    /**
+     * 设置联系人别名（从旧 Map 格式，兼容）
+     */
+    fun setContactAliasesFromMap(aliases: Map<String, String>) {
+        // 转换为新格式：按微信名分组
+        val grouped = aliases.entries.groupBy({ it.value }, { it.key })
+        setContacts(grouped)
+    }
+    
+    /**
+     * 根据语音输入的名字模糊匹配真实微信名
+     */
+    fun matchContactName(spokenName: String): String {
+        val aliases = getContactAliases()
+        
+        // 1. 完全匹配别名
+        aliases[spokenName]?.let { return it }
+        
+        // 2. 别名包含在语音中
+        for ((alias, wechatName) in aliases) {
+            if (spokenName.contains(alias) || alias.contains(spokenName)) {
+                return wechatName
+            }
+        }
+        
+        // 没有匹配到，返回原名
+        return spokenName
     }
     
     /**

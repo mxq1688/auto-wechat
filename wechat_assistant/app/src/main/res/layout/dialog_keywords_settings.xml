@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- ========== 联系人设置 ========== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#E3F2FD"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="👤 联系人列表"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="#1976D2" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="添加微信好友，设置多个简称方便语音识别"
+                android:textSize="12sp"
+                android:textColor="#666666" />
+
+            <!-- 已添加的联系人列表 -->
+            <LinearLayout
+                android:id="@+id/contactListContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="8dp" />
+
+            <!-- 添加联系人 -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#90CAF9"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="➕ 添加新联系人"
+                android:textSize="13sp"
+                android:textColor="#1976D2"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/editNewWechatName"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="微信名（如：大强）"
+                    android:inputType="text"
+                    android:padding="10dp"
+                    android:textSize="14sp"
+                    android:background="@android:drawable/edit_text" />
+
+                <Button
+                    android:id="@+id/btnAddContact"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="8dp"
+                    android:text="添加"
+                    android:textSize="13sp"
+                    android:backgroundTint="#4CAF50" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="💡 添加后可设置多个简称，如「强」「强子」都能匹配「大强」"
+                android:textSize="11sp"
+                android:textColor="#666666" />
+        </LinearLayout>
+
+        <!-- ========== 唤醒词设置 ========== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#FFF3E0"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎤 唤醒词（可选）"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="#E65100" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="防止误触发，先喊唤醒词再说指令"
+                android:textSize="12sp"
+                android:textColor="#666666" />
+
+            <!-- 唤醒词列表 -->
+            <LinearLayout
+                android:id="@+id/wakeWordListContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp" />
+
+            <!-- 添加唤醒词 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/editNewWakeWord"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="输入唤醒词，如：小智"
+                    android:inputType="text"
+                    android:padding="8dp"
+                    android:textSize="14sp"
+                    android:background="@android:drawable/edit_text" />
+
+                <Button
+                    android:id="@+id/btnAddWakeWord"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="8dp"
+                    android:text="添加"
+                    android:textSize="12sp"
+                    android:backgroundTint="#FF9800" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkRequireWakeWord"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="🔒 必须先说唤醒词才响应"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- ========== 通话关键词（折叠显示）========== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#F5F5F5"
+            android:padding="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="📞 通话触发词（高级）"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:textColor="#666666" />
+
+                <Button
+                    android:id="@+id/btnToggleAdvanced"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:text="展开"
+                    android:textSize="11sp"
+                    android:backgroundTint="#9E9E9E" />
+            </LinearLayout>
+
+            <!-- 高级设置内容（默认隐藏） -->
+            <LinearLayout
+                android:id="@+id/advancedSettingsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:layout_marginTop="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="语音包含这些词才会触发打电话"
+                    android:textSize="12sp"
+                    android:textColor="#888888"
+                    android:layout_marginBottom="8dp" />
+
+                <!-- 视频通话关键词 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎬 视频通话关键词"
+                    android:textSize="13sp"
+                    android:textColor="#333333" />
+
+                <LinearLayout
+                    android:id="@+id/videoKeywordListContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="4dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="4dp">
+
+                    <EditText
+                        android:id="@+id/editNewVideoKeyword"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="添加关键词"
+                        android:inputType="text"
+                        android:padding="6dp"
+                        android:textSize="13sp"
+                        android:background="@android:drawable/edit_text" />
+
+                    <Button
+                        android:id="@+id/btnAddVideoKeyword"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="4dp"
+                        android:text="+"
+                        android:textSize="14sp"
+                        android:backgroundTint="#2196F3" />
+                </LinearLayout>
+
+                <!-- 语音通话关键词 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="🔊 语音通话关键词"
+                    android:textSize="13sp"
+                    android:textColor="#333333" />
+
+                <LinearLayout
+                    android:id="@+id/voiceKeywordListContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="4dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="4dp">
+
+                    <EditText
+                        android:id="@+id/editNewVoiceKeyword"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="添加关键词"
+                        android:inputType="text"
+                        android:padding="6dp"
+                        android:textSize="13sp"
+                        android:background="@android:drawable/edit_text" />
+
+                    <Button
+                        android:id="@+id/btnAddVoiceKeyword"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="4dp"
+                        android:text="+"
+                        android:textSize="14sp"
+                        android:backgroundTint="#4CAF50" />
+                </LinearLayout>
+
+                <!-- 通用关键词 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="📱 通用关键词（默认视频）"
+                    android:textSize="13sp"
+                    android:textColor="#333333" />
+
+                <LinearLayout
+                    android:id="@+id/generalKeywordListContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="4dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="4dp">
+
+                    <EditText
+                        android:id="@+id/editNewGeneralKeyword"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="添加关键词"
+                        android:inputType="text"
+                        android:padding="6dp"
+                        android:textSize="13sp"
+                        android:background="@android:drawable/edit_text" />
+
+                    <Button
+                        android:id="@+id/btnAddGeneralKeyword"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="4dp"
+                        android:text="+"
+                        android:textSize="14sp"
+                        android:backgroundTint="#FF9800" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 隐藏的旧输入框（保持兼容） -->
+        <EditText
+            android:id="@+id/editContactAliases"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <EditText
+            android:id="@+id/editWakeWords"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <EditText
+            android:id="@+id/editVideoKeywords"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <EditText
+            android:id="@+id/editVoiceKeywords"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <EditText
+            android:id="@+id/editGeneralKeywords"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <EditText
+            android:id="@+id/editNewAlias"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+</ScrollView>

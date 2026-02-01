@@ -1,36 +1,95 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="#F5F5F5">
 
+    <!-- 标题栏 -->
     <LinearLayout
+        android:id="@+id/titleBar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="8dp"
+        android:background="#4CAF50"
+        android:elevation="4dp">
 
-        <!-- 标题 -->
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/tvTitle"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="16dp"
+            android:layout_weight="1"
             android:text="微信助手"
-            android:textColor="#333333"
-            android:textSize="28sp"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
+        <ImageButton
+            android:id="@+id/btnSettings"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_manage"
+            android:contentDescription="设置"
+            android:tint="#FFFFFF" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+        <!-- 隐藏的状态文本（供代码引用） -->
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="24dp"
-            android:text="智能自动化工具"
-            android:textColor="#666666"
-            android:textSize="14sp" />
+            android:id="@+id/statusText"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/accessibilityStatusText"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/messageCountText"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/notificationListenerStatusText"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
-        <!-- 状态卡片 -->
+        <!-- 隐藏的授权按钮（在设置对话框中使用） -->
+        <Button
+            android:id="@+id/enableServiceButton"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/enableNotificationListenerButton"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/startFloatingBallButton"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <!-- 语音控制 -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -44,370 +103,262 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="服务状态"
-                    android:textColor="#333333"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/statusText"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="悬浮窗权限: 检查中..."
-                    android:textColor="#666666"
-                    android:textSize="14sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="语音控制打电话"
+                        android:textColor="#333333"
+        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <Switch
+                        android:id="@+id/switchVoiceControl"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
 
                 <TextView
-                    android:id="@+id/accessibilityStatusText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="无障碍服务: 检查中..."
-                    android:textColor="#666666"
-                    android:textSize="14sp" />
+                    android:text="开启后直接说「给XXX打视频」即可拨打"
+                    android:textColor="#999999"
+                    android:textSize="12sp" />
 
                 <TextView
-                    android:id="@+id/messageCountText"
+                    android:id="@+id/voiceStatusText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="#E8F5E9"
+                    android:gravity="center"
+                    android:padding="16dp"
+                    android:text="语音控制已关闭"
+                    android:textColor="#333333"
+                    android:textSize="15sp" />
+
+                <!-- 联系人列表标题 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="📞 点击联系人拨打视频电话"
+                    android:textColor="#333333"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+                
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="长按可拨打语音电话"
+                    android:textColor="#757575"
+                    android:textSize="14sp" />
+
+                <!-- 联系人列表容器（网格布局） -->
+                <GridLayout
+                    android:id="@+id/contactListContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:columnCount="2"
+                    android:alignmentMode="alignMargins"
+                    android:useDefaultMargins="true" />
+
+                <TextView
+                    android:id="@+id/tvNoContacts"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:gravity="center"
+                    android:padding="32dp"
+                    android:text="暂无联系人\n请点击右上角设置添加"
+                    android:textColor="#757575"
+                    android:textSize="18sp"
+                    android:lineSpacingMultiplier="1.3"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- WebRTC 视频通话（暂时隐藏） -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:elevation="2dp"
+            android:backgroundTint="#FFFFFF"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📹 远程视频通话"
+                    android:textColor="#333333"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="已监控消息: 0 条"
-                    android:textColor="#666666"
-                    android:textSize="14sp" />
+                    android:text="通过 WebRTC 与其他设备进行视频通话"
+                    android:textColor="#999999"
+                    android:textSize="12sp" />
 
-                <TextView
-                    android:id="@+id/notificationListenerStatusText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="通知监听服务: 检查中..."
-                    android:textColor="#666666"
-                    android:textSize="14sp" />
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <!-- 快捷操作 -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:elevation="2dp"
-            android:backgroundTint="#FFFFFF">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="快捷操作"
-                    android:textColor="#333333"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <Button
-                    android:id="@+id/enableServiceButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:backgroundTint="#4CAF50"
-                    android:text="启用辅助功能服务"
-                    android:textColor="#FFFFFF" />
-
-                <Button
-                    android:id="@+id/enableNotificationListenerButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:backgroundTint="#E91E63"
-                    android:text="启用通知监听(自动接听必需)"
-                    android:textColor="#FFFFFF" />
-
-                <Button
-                    android:id="@+id/startFloatingBallButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:backgroundTint="#2196F3"
-                    android:text="启动悬浮球"
-                    android:textColor="#FFFFFF" />
-
-                <Button
-                    android:id="@+id/btnTestVideoCall"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:backgroundTint="#9C27B0"
-                    android:text="测试视频通话"
-                    android:textColor="#FFFFFF" />
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <!-- 功能开关 -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:elevation="2dp"
-            android:backgroundTint="#FFFFFF">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="功能开关"
-                    android:textColor="#333333"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="自动回复"
-                        android:textColor="#333333"
-                        android:textSize="15sp" />
-
-                    <Switch
-                        android:id="@+id/switchAutoReply"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginStart="16dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="群聊也自动回复"
-                        android:textColor="#666666"
-                        android:textSize="14sp" />
-
-                    <Switch
-                        android:id="@+id/switchAutoReplyInGroup"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginBottom="8dp"
-                    android:background="#E0E0E0" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="视频自动接听"
-                        android:textColor="#333333"
-                        android:textSize="15sp" />
-
-                    <Switch
-                        android:id="@+id/switchAutoAnswer"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginBottom="8dp"
-                    android:background="#E0E0E0" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="消息监控"
-                        android:textColor="#333333"
-                        android:textSize="15sp" />
-
-                    <Switch
-                        android:id="@+id/switchMessageMonitor"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginBottom="8dp"
-                    android:background="#E0E0E0" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="语音播报"
-                        android:textColor="#333333"
-                        android:textSize="15sp" />
-
-                    <Switch
-                        android:id="@+id/switchTTS"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-                </LinearLayout>
-
-                <Button
-                    android:id="@+id/btnManageRules"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:backgroundTint="#FF9800"
-                    android:text="管理回复规则"
-                    android:textColor="#FFFFFF" />
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <!-- 视频通话设置 -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:elevation="2dp"
-            android:backgroundTint="#FFFFFF">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="视频通话设置"
-                    android:textColor="#333333"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
+                <!-- 服务器地址 -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:text="信令服务器地址"
                     android:textColor="#666666"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
 
                 <EditText
                     android:id="@+id/editServerUrl"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
                     android:background="@drawable/edit_text_bg"
-                    android:hint="ws://server:port"
+                    android:hint="ws://192.168.1.100:8080"
                     android:inputType="textUri"
-                    android:padding="12dp"
+                    android:padding="10dp"
                     android:textSize="14sp" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="用户ID"
-                    android:textColor="#666666"
-                    android:textSize="14sp" />
-
-                <EditText
-                    android:id="@+id/editUserId"
+                <!-- 用户ID -->
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/edit_text_bg"
-                    android:hint="您的唯一标识"
-                    android:inputType="text"
-                    android:padding="12dp"
-                    android:textSize="14sp" />
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
 
-                <Button
-                    android:id="@+id/btnSaveSettings"
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="我的ID"
+                            android:textColor="#666666"
+                            android:textSize="13sp" />
+
+                        <EditText
+                            android:id="@+id/editUserId"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/edit_text_bg"
+                            android:hint="phone1"
+                            android:inputType="text"
+                            android:padding="10dp"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="对方ID"
+                            android:textColor="#666666"
+                            android:textSize="13sp" />
+
+                        <EditText
+                            android:id="@+id/editTargetUserId"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/edit_text_bg"
+                            android:hint="phone2"
+                            android:inputType="text"
+                            android:padding="10dp"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- 按钮 -->
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:backgroundTint="#4CAF50"
-                    android:text="保存设置"
-                    android:textColor="#FFFFFF" />
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnSaveSettings"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:backgroundTint="#607D8B"
+                        android:text="💾 保存"
+                        android:textColor="#FFFFFF" />
+
+                    <Button
+                        android:id="@+id/btnTestVideoCall"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:backgroundTint="#2196F3"
+                        android:text="📞 发起通话"
+                        android:textColor="#FFFFFF" />
+                </LinearLayout>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- 使用说明 -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            android:elevation="2dp"
-            android:backgroundTint="#FFFFFF">
+        <!-- 隐藏的功能开关（供 MainActivity 引用） -->
+        <Switch
+            android:id="@+id/switchAutoReply"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <Switch
+            android:id="@+id/switchAutoReplyInGroup"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <Switch
+            android:id="@+id/switchAutoAnswer"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <Switch
+            android:id="@+id/switchMessageMonitor"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <Switch
+            android:id="@+id/switchTTS"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <Button
+            android:id="@+id/btnManageRules"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="使用说明"
-                    android:textColor="#333333"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:lineSpacingExtra="4dp"
-                    android:text="1. 点击「启用辅助功能服务」并在系统设置中开启\n2. 点击「启用通知监听」并开启(自动接听视频必需!)\n3. 授予悬浮窗权限\n4. 启动悬浮球进行快捷操作\n5. 开启需要的功能开关\n6. 如需视频通话，请配置信令服务器"
-                    android:textColor="#999999"
-                    android:textSize="13sp" />
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-    </LinearLayout>
-</ScrollView>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
