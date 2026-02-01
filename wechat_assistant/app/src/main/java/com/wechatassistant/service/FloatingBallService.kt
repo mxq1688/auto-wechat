@@ -357,8 +357,8 @@ class FloatingBallService : Service() {
                     initialTouchY = event.rawY
                 isDragging = false
                 return true
-            }
-            MotionEvent.ACTION_MOVE -> {
+                }
+                MotionEvent.ACTION_MOVE -> {
                 val dx = event.rawX - initialTouchX
                 val dy = event.rawY - initialTouchY
                 
@@ -552,5 +552,5 @@ class FloatingBallService : Service() {
                 menuView?.let { windowManager.removeView(it) }
             }
         } catch (e: Exception) {}
+        }
     }
-}

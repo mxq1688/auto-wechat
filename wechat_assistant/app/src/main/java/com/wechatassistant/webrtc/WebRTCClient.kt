@@ -205,8 +205,8 @@ class WebRTCClient(
             object : PeerConnection.Observer {
                 override fun onSignalingChange(state: PeerConnection.SignalingState?) {
                     Log.d(TAG, "Signaling state: $state")
-                }
-                
+    }
+    
                 override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
                     Log.d(TAG, "ICE connection state: $state")
                     state?.let { observer.onIceConnectionChange(it) }

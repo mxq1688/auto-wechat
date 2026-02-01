@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var switchVoiceControl: Switch
     private lateinit var voiceStatusText: TextView
     private lateinit var contactListContainer: GridLayout
-    private lateinit var tvNoContacts: TextView
+    private lateinit var tvNoContacts: View
     
     private val serviceReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -501,9 +501,8 @@ class MainActivity : AppCompatActivity() {
         voiceRecognitionService?.setCommandListener(object : VoiceRecognitionService.VoiceCommandListener {
             override fun onCommandRecognized(command: String) {
                 runOnUiThread {
-                    val engineName = voiceRecognitionService?.getCurrentEngineName() ?: ""
-                    voiceStatusText.text = "🎤 [$engineName] 识别到: $command"
-                    voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_blue_light, null))
+                    voiceStatusText.text = "🎤 识别中..."
+                    voiceStatusText.setTextColor(0xFF2196F3.toInt())
                 }
                 // 继续监听
                 restartListeningIfEnabled()
@@ -513,8 +512,8 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     val contactName = command.contactName ?: return@runOnUiThread
                     val callType = if (command.type == VoiceCommandProcessor.CommandType.VIDEO_CALL) "视频" else "语音"
-                    voiceStatusText.text = "📞 正在给${contactName}拨打${callType}电话..."
-                    voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_green_light, null))
+                    voiceStatusText.text = "📞 拨打${contactName}..."
+                    voiceStatusText.setTextColor(0xFF4CAF50.toInt())
                     
                     // 执行打电话！
                     val isVideo = command.type == VoiceCommandProcessor.CommandType.VIDEO_CALL
@@ -526,8 +525,8 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     // 忽略"未识别到语音"错误，继续监听
                     if (!error.contains("未识别") && !error.contains("超时")) {
-                        voiceStatusText.text = "⚠️ $error"
-                        voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_orange_light, null))
+                        voiceStatusText.text = "⚠️ 出错"
+                        voiceStatusText.setTextColor(0xFFFF9800.toInt())
                     }
                 }
                 // 继续监听
@@ -536,15 +535,15 @@ class MainActivity : AppCompatActivity() {
             
             override fun onWakeWordDetected() {
                 runOnUiThread {
-                    voiceStatusText.text = "✨ 小智在听..."
-                    voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_green_light, null))
+                    voiceStatusText.text = "✨ 在听..."
+                    voiceStatusText.setTextColor(0xFF4CAF50.toInt())
                 }
             }
             
             override fun onWaitingForCommand() {
                 runOnUiThread {
-                    voiceStatusText.text = "✨ 小智在听，请说命令..."
-                    voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_green_light, null))
+                    voiceStatusText.text = "✨ 请说命令..."
+                    voiceStatusText.setTextColor(0xFF4CAF50.toInt())
                 }
                 // 继续监听等待命令
                 restartListeningIfEnabled()
@@ -552,15 +551,15 @@ class MainActivity : AppCompatActivity() {
             
             override fun onModelDownloadProgress(progress: Int) {
                 runOnUiThread {
-                    voiceStatusText.text = "📥 正在下载离线模型: $progress%"
-                    voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_orange_light, null))
+                    voiceStatusText.text = "📥 下载: $progress%"
+                    voiceStatusText.setTextColor(0xFFFF9800.toInt())
                 }
             }
             
             override fun onModelReady() {
                 runOnUiThread {
-                    voiceStatusText.text = "✅ 离线模型已就绪 (Vosk)"
-                    voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_green_light, null))
+                    voiceStatusText.text = "✅ 就绪"
+                    voiceStatusText.setTextColor(0xFF4CAF50.toInt())
                 }
             }
         })
@@ -589,7 +588,7 @@ class MainActivity : AppCompatActivity() {
             
             android.util.Log.d("MainActivity", "Starting voice recognition...")
             voiceStatusText.text = "🎤 说「给XXX打电话」"
-            voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_green_light, null))
+            voiceStatusText.setTextColor(0xFF4CAF50.toInt())
             
             if (voiceRecognitionService != null) {
                 voiceRecognitionService?.startListening()
@@ -599,8 +598,8 @@ class MainActivity : AppCompatActivity() {
                 showToast("语音服务初始化失败")
             }
         } else {
-            voiceStatusText.text = "语音控制已关闭"
-            voiceStatusText.setBackgroundColor(0xFFE8F5E9.toInt())
+            voiceStatusText.text = "已关闭"
+            voiceStatusText.setTextColor(0xFF888888.toInt())
             voiceRecognitionService?.stopListening()
         }
     }
@@ -612,7 +611,7 @@ class MainActivity : AppCompatActivity() {
                 if (isVoiceControlEnabled) {
                     runOnUiThread {
                         voiceStatusText.text = "🎤 说「给XXX打电话」"
-                        voiceStatusText.setBackgroundColor(resources.getColor(android.R.color.holo_green_light, null))
+                        voiceStatusText.setTextColor(0xFF4CAF50.toInt())
                     }
                     voiceRecognitionService?.startListening()
                 }
@@ -652,13 +651,15 @@ class MainActivity : AppCompatActivity() {
         
         // 转换 dp 到 px
         val density = resources.displayMetrics.density
-        val photoSize = (140 * density).toInt()  // 140dp 大圆形照片
-        val itemMargin = (16 * density).toInt()
-        
-        // 计算列数（屏幕宽度 / 单个项目宽度）
         val screenWidth = resources.displayMetrics.widthPixels
-        val itemTotalWidth = photoSize + itemMargin * 2
-        val columnCount = maxOf(2, (screenWidth - itemMargin) / itemTotalWidth)
+        
+        // 固定3列，计算每个头像大小
+        val columnCount = 3
+        val totalPadding = (32 * density).toInt()  // 两边padding
+        val totalMargin = ((columnCount + 1) * 8 * density).toInt()  // 间距
+        val photoSize = (screenWidth - totalPadding - totalMargin) / columnCount
+        val itemMargin = (8 * density).toInt()
+        
         contactListContainer.columnCount = columnCount
         
         contacts.forEach { (wechatName, _) ->
@@ -672,9 +673,11 @@ class MainActivity : AppCompatActivity() {
                     setMargins(itemMargin, itemMargin, itemMargin, itemMargin)
                 }
                 layoutParams = params
+                isClickable = true
+                isFocusable = true
             }
             
-            // 圆形头像容器
+            // 圆形头像容器（带阴影效果）
             val photoContainer = android.widget.FrameLayout(this).apply {
                 layoutParams = LinearLayout.LayoutParams(photoSize, photoSize)
                 // 圆形裁剪
@@ -684,6 +687,7 @@ class MainActivity : AppCompatActivity() {
                         outline.setOval(0, 0, view.width, view.height)
                     }
                 }
+                elevation = 4 * density  // 添加阴影
             }
             
             // 圆形头像
@@ -712,7 +716,7 @@ class MainActivity : AppCompatActivity() {
             if (photoPath == null || !java.io.File(photoPath).exists()) {
                 val initialView = TextView(this).apply {
                     text = wechatName.firstOrNull()?.toString() ?: "?"
-                    textSize = 48f
+                    textSize = 32f
                     setTextColor(0xFFFFFFFF.toInt())
                     gravity = android.view.Gravity.CENTER
                     layoutParams = android.widget.FrameLayout.LayoutParams(
@@ -726,10 +730,10 @@ class MainActivity : AppCompatActivity() {
             // 名字标签
             val nameView = TextView(this).apply {
                 text = wechatName
-                textSize = 16f
+                textSize = 14f
                 setTextColor(0xFF333333.toInt())
                 gravity = android.view.Gravity.CENTER
-                setPadding(0, (8 * density).toInt(), 0, 0)
+                setPadding(0, (6 * density).toInt(), 0, 0)
                 maxLines = 1
                 maxWidth = photoSize
                 ellipsize = android.text.TextUtils.TruncateAt.END
@@ -737,6 +741,37 @@ class MainActivity : AppCompatActivity() {
             
             contactItem.addView(photoContainer)
             contactItem.addView(nameView)
+            
+            // 添加按压动画效果（放大）
+            contactItem.setOnTouchListener { v, event ->
+                when (event.action) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        // 按下时放大 + 增加阴影
+                        v.animate()
+                            .scaleX(1.1f)
+                            .scaleY(1.1f)
+                            .setDuration(120)
+                            .start()
+                        photoContainer.animate()
+                            .translationZ(12 * density)
+                            .setDuration(120)
+                            .start()
+                    }
+                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                        // 松开时恢复
+                        v.animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(120)
+                            .start()
+                        photoContainer.animate()
+                            .translationZ(0f)
+                            .setDuration(120)
+                            .start()
+                    }
+                }
+                false // 返回false让点击事件继续传递
+            }
             
             // 点击拨打视频
             contactItem.setOnClickListener {

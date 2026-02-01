@@ -82,6 +82,8 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
     
     // 语音控制打电话状态
     private var isExecutingCallCommand = false
+    private var isOperationCancelled = false  // 是否已取消操作
+    private var hasEnteredWeChat = false      // 是否已经进入微信（用于离开检测）
     private var targetContactName: String? = null
     private var isVideoCall = true  // true=视频通话, false=语音通话
     private var callCommandStep = 0  // 当前执行步骤
@@ -750,6 +752,7 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
         
         Log.d(TAG, "Starting make call: contact=$contactName, isVideo=$isVideo")
         isExecutingCallCommand = true
+        isOperationCancelled = false
         targetContactName = contactName
         isVideoCall = isVideo
         callCommandStep = 0
@@ -757,18 +760,36 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
         val callType = if (isVideo) "视频" else "语音"
         ttsManager?.speak("正在给${contactName}拨打${callType}电话")
         
+        // 显示全屏遮罩，防止用户误操作
+        CallOverlayService.show(this, contactName, isVideo)
+        
         // 步骤1: 打开微信
         handler.postDelayed({
-            openWeChat()
+            if (!isOperationCancelled) {
+                openWeChat()
+            }
         }, 1000)
+    }
+    
+    /**
+     * 取消当前操作
+     */
+    fun cancelCurrentOperation() {
+        Log.d(TAG, "Cancelling current operation")
+        isOperationCancelled = true
+        ttsManager?.speak("已取消")
+        resetCallCommand()
     }
     
     /**
      * 步骤1: 打开微信
      */
     private fun openWeChat() {
+        if (isOperationCancelled) return
+        
         Log.d(TAG, "Step 1: Opening WeChat")
         callCommandStep = 1
+        CallOverlayService.updateStatus("正在打开微信...")
         
         try {
             // 方法1: 尝试获取启动Intent
@@ -790,13 +811,16 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
             
             // 等待微信打开后，点击搜索
             handler.postDelayed({
-                clickSearchButton()
+                if (!isOperationCancelled) {
+                    clickSearchButton()
+                }
             }, 2000)
             
         } catch (e: Exception) {
             Log.e(TAG, "Error opening WeChat", e)
             ttsManager?.speak("打开微信失败，请确认微信已安装")
-            resetCallCommand()
+            CallOverlayService.updateStatus("打开微信失败")
+            handler.postDelayed({ resetCallCommand() }, 2000)
         }
     }
     
@@ -805,8 +829,11 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
      * 直接使用坐标点击（更可靠）
      */
     private fun clickSearchButton() {
+        if (isOperationCancelled) return
+        
         Log.d(TAG, "========== Step 2: Click search button ==========")
         callCommandStep = 2
+        CallOverlayService.updateStatus("正在点击搜索...")
         
         // 优先使用用户自定义坐标
         val coord = coordSearchButton
@@ -830,7 +857,11 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
         Log.d(TAG, "Clicking search at ($searchX, $searchY)")
         performClickGesture(searchX, searchY)
         
-        handler.postDelayed({ inputContactName() }, 1500)
+        handler.postDelayed({
+            if (!isOperationCancelled) {
+                inputContactName()
+            }
+        }, 1500)
     }
     
     /**
@@ -852,13 +883,17 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
     private var inputRetryCount = 0
     
     private fun inputContactName() {
+        if (isOperationCancelled) return
+        
         Log.d(TAG, "========== Step 3: Input contact name: $targetContactName ==========")
         callCommandStep = 3
+        CallOverlayService.updateStatus("正在输入联系人名称...")
         
         val contactName = targetContactName ?: ""
         if (contactName.isEmpty()) {
             Log.e(TAG, "Contact name is empty!")
-            resetCallCommand()
+            CallOverlayService.updateStatus("联系人名称为空")
+            handler.postDelayed({ resetCallCommand() }, 2000)
             return
         }
         
@@ -866,7 +901,9 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
         Log.d(TAG, "Will try to input text: $contactName")
         
         handler.postDelayed({
-            trySetTextToSearchInput(contactName)
+            if (!isOperationCancelled) {
+                trySetTextToSearchInput(contactName)
+            }
         }, 800)
     }
     
@@ -1168,8 +1205,11 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
      * 步骤4: 点击搜索结果中的第一个联系人
      */
     private fun clickFirstSearchResult() {
+        if (isOperationCancelled) return
+        
         Log.d(TAG, "========== Step 4: Click first search result ==========")
         callCommandStep = 4
+        CallOverlayService.updateStatus("正在选择联系人...")
         
         // 优先使用用户自定义坐标
         val coord = coordFirstResult
@@ -1191,7 +1231,11 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
         Log.d(TAG, "Clicking first search result at ($resultX, $resultY)")
         performClickGesture(resultX, resultY)
         
-        handler.postDelayed({ clickPlusButton() }, 2000)
+        handler.postDelayed({
+            if (!isOperationCancelled) {
+                clickPlusButton()
+            }
+        }, 2000)
     }
     
     // 保留原方法但不再使用
@@ -1329,8 +1373,11 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
      * 步骤5: 点击聊天界面的 + 号按钮
      */
     private fun clickPlusButton() {
+        if (isOperationCancelled) return
+        
         Log.d(TAG, "========== Step 5: Click plus button ==========")
         callCommandStep = 5
+        CallOverlayService.updateStatus("正在打开功能菜单...")
         
         // 优先使用用户自定义坐标
         val coord = coordPlusButton
@@ -1352,7 +1399,11 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
         Log.d(TAG, "Clicking + button at ($plusX, $plusY)")
         performClickGesture(plusX, plusY)
         
-        handler.postDelayed({ clickVideoCallOption() }, 1500)
+        handler.postDelayed({
+            if (!isOperationCancelled) {
+                clickVideoCallOption()
+            }
+        }, 1500)
     }
     
     /**
@@ -1360,8 +1411,12 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
      * + 菜单展开后，视频通话在底部弹出的菜单第一行
      */
     private fun clickVideoCallOption() {
+        if (isOperationCancelled) return
+        
         Log.d(TAG, "========== Step 6: Click call option, isVideo=$isVideoCall ==========")
         callCommandStep = 6
+        val callType = if (isVideoCall) "视频" else "语音"
+        CallOverlayService.updateStatus("正在选择${callType}通话...")
         
         // 优先使用用户自定义坐标
         val coord = coordVideoCall
@@ -1384,7 +1439,11 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
         Log.d(TAG, "Clicking video call option at ($optionX, $optionY)")
         performClickGesture(optionX, optionY)
         
-        handler.postDelayed({ clickVideoCallConfirm() }, 1500)
+        handler.postDelayed({
+            if (!isOperationCancelled) {
+                clickVideoCallConfirm()
+            }
+        }, 1500)
     }
     
     /**
@@ -1392,8 +1451,12 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
      * 弹窗确认选择
      */
     private fun clickVideoCallConfirm() {
+        if (isOperationCancelled) return
+        
         Log.d(TAG, "Step 7: Click call confirm")
         callCommandStep = 7
+        val callType = if (isVideoCall) "视频" else "语音"
+        CallOverlayService.updateStatus("正在确认${callType}通话...")
         
         val rootNode = rootInActiveWindow
         if (rootNode == null) {
@@ -1446,9 +1509,16 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
     
     private fun finishCall() {
         val callType = if (isVideoCall) "视频" else "语音"
-        ttsManager?.speak("正在拨打${callType}电话")
+        val contactName = targetContactName ?: ""
+        
+        CallOverlayService.updateStatus("✅ 已发起${callType}通话")
+        ttsManager?.speak("正在给${contactName}拨打${callType}电话")
         Log.d(TAG, "Call initiated!")
-        resetCallCommand()
+        
+        // 延迟关闭遮罩，让用户看到成功提示
+        handler.postDelayed({
+            resetCallCommand()
+        }, 1500)
     }
     
     // 保留旧函数名以兼容
@@ -1465,9 +1535,14 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
      */
     private fun resetCallCommand() {
         isExecutingCallCommand = false
+        isOperationCancelled = false
+        hasEnteredWeChat = false
         targetContactName = null
         callCommandStep = 0
         scrollAttempts = 0
+        
+        // 隐藏遮罩
+        CallOverlayService.hide()
     }
     
     /**

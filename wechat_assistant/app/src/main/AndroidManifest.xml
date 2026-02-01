@@ -107,6 +107,11 @@
             android:name=".service.CoordinatePickerService"
             android:exported="false" />
         
+        <!-- 拨打电话遮罩服务 -->
+        <service
+            android:name=".service.CallOverlayService"
+            android:exported="false" />
+        
         <!-- FileProvider 用于拍照 -->
         <provider
             android:name="androidx.core.content.FileProvider"

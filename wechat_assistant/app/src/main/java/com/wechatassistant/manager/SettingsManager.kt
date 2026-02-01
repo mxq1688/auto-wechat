@@ -62,10 +62,20 @@ class SettingsManager private constructor(context: Context) {
         // 联系人照片（格式：微信名=照片路径）
         const val KEY_CONTACT_PHOTOS = "contact_photos"
         
+        // LLM 大模型设置
+        const val KEY_LLM_ENABLED = "llm_enabled"
+        const val KEY_LLM_API_URL = "llm_api_url"
+        const val KEY_LLM_API_KEY = "llm_api_key"
+        const val DEFAULT_LLM_API_URL = "https://api.deepseek.com/chat/completions"
+        
         // 默认关键词
         val DEFAULT_VIDEO_KEYWORDS = setOf("视频", "视频通话", "视频电话", "打视频")
         val DEFAULT_VOICE_KEYWORDS = setOf("语音", "语音通话")
-        val DEFAULT_GENERAL_KEYWORDS = setOf("打电话", "通话", "打个电话", "呼叫", "联系")
+        val DEFAULT_GENERAL_KEYWORDS = setOf(
+            "打电话", "通话", "打个电话", "呼叫", "联系", "打给", "找", "拨打", "聊聊", "聊一下",
+            // 凤阳方言 - "给"发音gé，可能识别成：
+            "打个", "打格", "打隔", "个电话", "格电话", "隔电话"
+        )
         val DEFAULT_WAKE_WORDS = setOf("小智", "小志", "小知")
         
         // 默认联系人（微信名 -> 别名列表）
@@ -130,6 +140,20 @@ class SettingsManager private constructor(context: Context) {
     var ttsPitch: Float
         get() = prefs.getFloat(KEY_TTS_PITCH, 1.0f)
         set(value) = prefs.edit().putFloat(KEY_TTS_PITCH, value).apply()
+    
+    // ==================== LLM 大模型设置 ====================
+    
+    var llmEnabled: Boolean
+        get() = prefs.getBoolean(KEY_LLM_ENABLED, false)
+        set(value) = prefs.edit().putBoolean(KEY_LLM_ENABLED, value).apply()
+    
+    var llmApiUrl: String
+        get() = prefs.getString(KEY_LLM_API_URL, DEFAULT_LLM_API_URL) ?: DEFAULT_LLM_API_URL
+        set(value) = prefs.edit().putString(KEY_LLM_API_URL, value).apply()
+    
+    var llmApiKey: String
+        get() = prefs.getString(KEY_LLM_API_KEY, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_LLM_API_KEY, value).apply()
     
     // ==================== 悬浮球设置 ====================
     

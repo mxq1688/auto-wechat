@@ -97,12 +97,24 @@ class VoiceSettingsActivity : AppCompatActivity() {
         setupListeners()
     }
     
+    // LLM 相关 View
+    private lateinit var switchLLM: Switch
+    private lateinit var llmConfigContainer: LinearLayout
+    private lateinit var editLLMApiUrl: EditText
+    private lateinit var editLLMApiKey: EditText
+    
     private fun initViews() {
         contactListContainer = findViewById(R.id.contactListContainer)
         wakeWordListContainer = findViewById(R.id.wakeWordListContainer)
         videoKeywordListContainer = findViewById(R.id.videoKeywordListContainer)
         voiceKeywordListContainer = findViewById(R.id.voiceKeywordListContainer)
         generalKeywordListContainer = findViewById(R.id.generalKeywordListContainer)
+        
+        // LLM 配置
+        switchLLM = findViewById(R.id.switchLLM)
+        llmConfigContainer = findViewById(R.id.llmConfigContainer)
+        editLLMApiUrl = findViewById(R.id.editLLMApiUrl)
+        editLLMApiKey = findViewById(R.id.editLLMApiKey)
     }
     
     private fun loadData() {
@@ -132,6 +144,12 @@ class VoiceSettingsActivity : AppCompatActivity() {
         
         // 设置唤醒词开关
         findViewById<CheckBox>(R.id.checkRequireWakeWord).isChecked = settings.requireWakeWord
+        
+        // 加载 LLM 配置
+        switchLLM.isChecked = settings.llmEnabled
+        editLLMApiUrl.setText(settings.llmApiUrl)
+        editLLMApiKey.setText(settings.llmApiKey)
+        llmConfigContainer.visibility = if (settings.llmEnabled) android.view.View.VISIBLE else android.view.View.GONE
         
         // 刷新界面
         refreshContactList()
@@ -211,6 +229,11 @@ class VoiceSettingsActivity : AppCompatActivity() {
             }
         }
         
+        // LLM 开关
+        switchLLM.setOnCheckedChangeListener { _, isChecked ->
+            llmConfigContainer.visibility = if (isChecked) android.view.View.VISIBLE else android.view.View.GONE
+        }
+        
         // 恢复默认
         findViewById<Button>(R.id.btnResetDefault).setOnClickListener {
             settings.setWakeWords(SettingsManager.DEFAULT_WAKE_WORDS)
@@ -231,6 +254,11 @@ class VoiceSettingsActivity : AppCompatActivity() {
         settings.setVideoCallKeywords(videoKeywordList.toSet())
         settings.setVoiceCallKeywords(voiceKeywordList.toSet())
         settings.setGeneralCallKeywords(generalKeywordList.toSet())
+        
+        // 保存 LLM 配置
+        settings.llmEnabled = switchLLM.isChecked
+        settings.llmApiUrl = editLLMApiUrl.text.toString().trim()
+        settings.llmApiKey = editLLMApiKey.text.toString().trim()
     }
     
     private fun refreshContactList() {
@@ -477,11 +505,14 @@ class VoiceSettingsActivity : AppCompatActivity() {
             // 读取EXIF方向并旋转
             bitmap = rotateImageIfRequired(bitmap, sourceFile.absolutePath)
             
-            // 压缩并保存
-            val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 200, 200, true)
+            // 居中裁剪成正方形再缩放（不变形）
+            val croppedBitmap = centerCropToSquare(bitmap, 400)
             FileOutputStream(destFile).use { out ->
-                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
             }
+            
+            // 回收原图
+            if (bitmap != croppedBitmap) bitmap.recycle()
             
             // 删除临时文件
             sourceFile.delete()
@@ -509,16 +540,46 @@ class VoiceSettingsActivity : AppCompatActivity() {
                     bitmap = rotateImageByExif(bitmap, exif)
                 }
                 
-                val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 200, 200, true)
+                // 居中裁剪成正方形再缩放（不变形）
+                val croppedBitmap = centerCropToSquare(bitmap, 400)
                 FileOutputStream(destFile).use { out ->
-                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                    croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
                 }
+                
+                // 回收原图
+                if (bitmap != croppedBitmap) bitmap.recycle()
             }
             
             destFile.absolutePath
         } catch (e: Exception) {
             Toast.makeText(this, "保存照片失败: ${e.message}", Toast.LENGTH_SHORT).show()
             null
+        }
+    }
+    
+    /**
+     * 居中裁剪成正方形并缩放
+     */
+    private fun centerCropToSquare(bitmap: Bitmap, targetSize: Int): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        
+        // 先裁剪成正方形
+        val squareSize = minOf(width, height)
+        val x = (width - squareSize) / 2
+        val y = (height - squareSize) / 2
+        
+        val croppedBitmap = Bitmap.createBitmap(bitmap, x, y, squareSize, squareSize)
+        
+        // 再缩放到目标尺寸
+        return if (squareSize != targetSize) {
+            val scaledBitmap = Bitmap.createScaledBitmap(croppedBitmap, targetSize, targetSize, true)
+            if (croppedBitmap != bitmap && croppedBitmap != scaledBitmap) {
+                croppedBitmap.recycle()
+            }
+            scaledBitmap
+        } else {
+            croppedBitmap
         }
     }
     

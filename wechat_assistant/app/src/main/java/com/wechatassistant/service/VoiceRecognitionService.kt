@@ -11,7 +11,9 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import com.wechatassistant.manager.SettingsManager
 import com.wechatassistant.voice.VoiceCommandProcessor
+import kotlinx.coroutines.*
 
 /**
  * 语音识别服务
@@ -50,6 +52,11 @@ class VoiceRecognitionService(private val context: Context) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var ttsManager: TTSManager? = null
     private var ttsEnabled = true
+    
+    // LLM 智能分析
+    private val llmService = LLMService()
+    private val settings = SettingsManager.getInstance(context)
+    private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     
     // 模型状态
     private var isVoskModelReady = false
@@ -431,13 +438,76 @@ class VoiceRecognitionService(private val context: Context) {
             }
         }
         
-        // 解析命令
+        // 先用关键词初步判断是否可能是打电话命令
         val commandToParse = if (hasWakeWord) actualCommand else voiceInput
-        val command = commandProcessor.parseCommand(commandToParse)
-        Log.d(TAG, "Parsed command: type=${command.type}, contact=${command.contactName}")
+        val preliminaryCommand = commandProcessor.parseCommand(commandToParse)
         
-        // 执行命令
-        executeCommand(command)
+        // 如果启用了 LLM 且检测到可能是打电话相关
+        if (settings.llmEnabled && settings.llmApiKey.isNotEmpty() && 
+            isPotentialCallCommand(commandToParse)) {
+            Log.d(TAG, "Using LLM for smart analysis...")
+            analyzeWithLLM(commandToParse)
+        } else {
+            // 直接用关键词解析结果
+            Log.d(TAG, "Parsed command: type=${preliminaryCommand.type}, contact=${preliminaryCommand.contactName}")
+            executeCommand(preliminaryCommand)
+        }
+    }
+    
+    /**
+     * 判断是否可能是打电话命令（用于决定是否调用 LLM）
+     */
+    private fun isPotentialCallCommand(text: String): Boolean {
+        val keywords = listOf("打", "电话", "视频", "语音", "通话", "呼叫", "联系", "找", "叫")
+        return keywords.any { text.contains(it) }
+    }
+    
+    /**
+     * 使用 LLM 智能分析命令
+     */
+    private fun analyzeWithLLM(voiceInput: String) {
+        // 配置 LLM
+        llmService.setConfig(settings.llmApiUrl, settings.llmApiKey)
+        
+        // 获取联系人列表
+        val contacts = settings.getContacts().keys.toList() + 
+                       settings.getContactAliases().keys.toList()
+        
+        coroutineScope.launch {
+            try {
+                val result = llmService.analyzeCommand(voiceInput, contacts)
+                
+                mainHandler.post {
+                    if (result.success && result.isCallCommand && result.contactName != null) {
+                        Log.d(TAG, "LLM analysis: contact=${result.contactName}, isVideo=${result.isVideo}, confidence=${result.confidence}")
+                        
+                        // 创建命令并直接执行
+                        val command = VoiceCommandProcessor.Command(
+                            type = if (result.isVideo) VoiceCommandProcessor.CommandType.VIDEO_CALL 
+                                   else VoiceCommandProcessor.CommandType.VOICE_CALL,
+                            contactName = result.contactName,
+                            rawCommand = voiceInput
+                        )
+                        executeCommand(command)
+                    } else if (result.success && !result.isCallCommand) {
+                        Log.d(TAG, "LLM: Not a call command")
+                        // 不是打电话命令，忽略
+                    } else {
+                        Log.w(TAG, "LLM analysis failed: ${result.error}, falling back to keyword matching")
+                        // LLM 失败，回退到关键词匹配
+                        val command = commandProcessor.parseCommand(voiceInput)
+                        executeCommand(command)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "LLM error", e)
+                // 出错时回退到关键词匹配
+                mainHandler.post {
+                    val command = commandProcessor.parseCommand(voiceInput)
+                    executeCommand(command)
+                }
+            }
+        }
     }
     
     /**
