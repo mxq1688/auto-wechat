@@ -1,6 +1,6 @@
 name: wechat_assistant_flutter
-description: WeChat video call assistant with auto-answer and voice control
-version: 1.0.0+1
+description: WeChat assistant with auto-reply, message monitoring, video call and voice control
+version: 2.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -11,12 +11,15 @@ dependencies:
   
   # UI Components
   cupertino_icons: ^1.0.2
+  material_design_icons_flutter: ^7.0.7296
   
   # State Management
   provider: ^6.0.5
   
-  # WebRTC
+  # WebRTC & Communication
   flutter_webrtc: ^0.9.47
+  web_socket_channel: ^2.4.0
+  socket_io_client: ^2.0.3+1
   
   # Speech Recognition & TTS
   speech_to_text: ^6.5.1
@@ -25,19 +28,42 @@ dependencies:
   # Permissions
   permission_handler: ^11.0.1
   
-  # Local Storage
+  # Local Storage & Database
   shared_preferences: ^2.2.2
+  sqflite: ^2.3.0
+  path: ^1.8.3
   
-  # HTTP
+  # HTTP & Networking
   http: ^1.1.0
+  dio: ^5.4.0
   
-  # Signaling (PeerJS alternative)
-  web_socket_channel: ^2.4.0
+  # Floating Widget
+  flutter_overlay_window: ^0.3.2
+  system_alert_window: ^1.1.2
+  
+  # Notifications
+  flutter_local_notifications: ^16.3.0
+  
+  # Date & Time
+  intl: ^0.18.1
+  
+  # JSON Serialization
+  json_annotation: ^4.8.1
+  
+  # UI Enhancements
+  animations: ^2.0.8
+  shimmer: ^3.0.0
+  badges: ^3.1.1
+  
+  # Regex & Pattern Matching
+  validators: ^3.0.0
   
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
+  json_serializable: ^6.7.1
+  build_runner: ^2.4.7
 
 flutter:
   uses-material-design: true
@@ -45,3 +71,11 @@ flutter:
   assets:
     - assets/images/
     - assets/sounds/
+    - assets/icons/
+  
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
