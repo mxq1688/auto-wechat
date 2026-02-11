@@ -61,12 +61,22 @@ class VoiceRecognitionService(private val context: Context) {
     // 模型状态
     private var isVoskModelReady = false
     private var isInitializing = false
+    private var pendingStartListening = false
     
     init {
         Log.d(TAG, "Initializing VoiceRecognitionService...")
         // 初始化 TTS
         try {
             ttsManager = TTSManager(context)
+            // TTS 播报前暂停录音，播报完恢复录音
+            ttsManager?.setOnSpeechStartListener {
+                Log.d(TAG, "TTS start → pausing voice recording")
+                pauseListeningForTTS()
+            }
+            ttsManager?.setOnSpeechDoneListener {
+                Log.d(TAG, "TTS done → resuming voice recording")
+                resumeListeningAfterTTS()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to init TTS: ${e.message}")
         }
@@ -106,8 +116,8 @@ class VoiceRecognitionService(private val context: Context) {
         if (isInitializing) return
         isInitializing = true
         
-        // 首先尝试 Vosk
-        Log.d(TAG, "Trying Vosk (offline) engine...")
+        // 始终优先加载 Vosk（离线引擎）
+        Log.d(TAG, "Loading Vosk (offline) engine...")
         voskService = VoskVoiceService(context)
         
         voskService?.setListener(object : VoskVoiceService.VoskListener {
@@ -145,33 +155,38 @@ class VoiceRecognitionService(private val context: Context) {
                 currentEngine = Engine.VOSK
                 mainHandler.post {
                     commandListener?.onModelReady()
+                    // 有等待中的 startListening 请求，立即用 Vosk 启动
+                    if (pendingStartListening) {
+                        Log.d(TAG, "Vosk ready, executing pending startListening")
+                        pendingStartListening = false
+                        startListening()
+                    }
+                    // 已在用讯飞监听的情况下，自动切换到 Vosk
+                    if (isListening && currentEngine == Engine.VOSK) {
+                        Log.d(TAG, "Vosk ready, auto-switching from Xunfei to Vosk")
+                        xunfeiService?.stopListening()
+                        isListening = false
+                        startListening()
+                    }
                 }
             }
         })
         
-        // 检查 Vosk 模型
-        if (voskService?.isModelReady() == true) {
-            Log.d(TAG, "Vosk model already exists, loading...")
-            voskService?.initModel { success ->
-                isInitializing = false
-                if (success) {
-                    isVoskModelReady = true
-                    currentEngine = Engine.VOSK
-                    Log.d(TAG, "Using Vosk engine (offline)")
-                } else {
-                    fallbackToXunfei()
-                }
-            }
-        } else {
-            // 模型不存在，先用讯飞，后台下载 Vosk 模型
-            Log.d(TAG, "Vosk model not found, using Xunfei first, downloading Vosk model in background...")
-            fallbackToXunfei()
-            
-            // 后台下载 Vosk 模型
-            voskService?.initModel { success ->
-                if (success) {
-                    isVoskModelReady = true
-                    Log.d(TAG, "Vosk model downloaded and ready! Will use Vosk next time.")
+        // 始终尝试加载 Vosk 模型（不管文件是否已存在）
+        voskService?.initModel { success ->
+            isInitializing = false
+            if (success) {
+                isVoskModelReady = true
+                currentEngine = Engine.VOSK
+                Log.d(TAG, "Vosk engine (offline) ready")
+            } else {
+                // Vosk 加载失败，降级到讯飞
+                Log.w(TAG, "Vosk model failed to load, falling back to Xunfei")
+                fallbackToXunfei()
+                // 如果有等待中的请求，立即用讯飞执行
+                if (pendingStartListening) {
+                    pendingStartListening = false
+                    mainHandler.post { startListening() }
                 }
             }
         }
@@ -185,7 +200,7 @@ class VoiceRecognitionService(private val context: Context) {
         currentEngine = Engine.XUNFEI
         
         xunfeiService = XunfeiVoiceService(context)
-        commandListener?.let { xunfeiService?.setCommandListener(it) }
+        commandListener?.let { xunfeiService?.setCommandListener(createXunfeiListenerWrapper(it)) }
         
         isInitializing = false
         Log.d(TAG, "Using Xunfei engine (online)")
@@ -252,10 +267,17 @@ class VoiceRecognitionService(private val context: Context) {
     }
     
     fun startListening() {
-        Log.d(TAG, "startListening called, engine=$currentEngine, isListening=$isListening")
+        Log.d(TAG, "startListening called, engine=$currentEngine, isListening=$isListening, voskReady=$isVoskModelReady, initializing=$isInitializing")
         
         if (isListening) {
             Log.d(TAG, "Already listening, ignoring")
+            return
+        }
+        
+        // Vosk 正在加载中，排队等待
+        if (isInitializing && !isVoskModelReady) {
+            Log.d(TAG, "Vosk model still loading, queuing startListening request")
+            pendingStartListening = true
             return
         }
         
@@ -268,14 +290,13 @@ class VoiceRecognitionService(private val context: Context) {
                     } else {
                         // Vosk 启动失败，降级到讯飞
                         Log.w(TAG, "Vosk failed to start, falling back to Xunfei")
-                        switchToXunfei()
+                        fallbackToXunfei()
                         startXunfeiListening()
                     }
                 } else {
-                    // 模型未就绪，用讯飞
-                    Log.d(TAG, "Vosk model not ready, using Xunfei")
-                    switchToXunfei()
-                    startXunfeiListening()
+                    // 模型未就绪，等待加载完成
+                    Log.d(TAG, "Vosk model not ready, queuing startListening request")
+                    pendingStartListening = true
                 }
             }
             Engine.XUNFEI -> {
@@ -391,11 +412,48 @@ class VoiceRecognitionService(private val context: Context) {
                 Engine.SYSTEM -> speechRecognizer?.stopListening()
             }
             isListening = false
+            isPausedForTTS = false
             Log.d(TAG, "Stopped listening")
         }
     }
     
     fun isListening(): Boolean = isListening
+    
+    // TTS 播报时临时暂停录音
+    private var isPausedForTTS = false
+    
+    private fun pauseListeningForTTS() {
+        if (isListening) {
+            Log.d(TAG, "Pausing listening for TTS playback")
+            when (currentEngine) {
+                Engine.VOSK -> voskService?.stopListening()
+                Engine.XUNFEI -> xunfeiService?.stopListening()
+                Engine.SYSTEM -> speechRecognizer?.stopListening()
+            }
+            isPausedForTTS = true
+            // 不设 isListening=false，保持逻辑状态
+        }
+    }
+    
+    private fun resumeListeningAfterTTS() {
+        if (isPausedForTTS) {
+            Log.d(TAG, "Resuming listening after TTS playback")
+            isPausedForTTS = false
+            // 延迟 500ms 恢复，确保 TTS 音频完全结束
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                if (isListening) {
+                    when (currentEngine) {
+                        Engine.VOSK -> voskService?.startListening()
+                        Engine.XUNFEI -> xunfeiService?.startListening()
+                        Engine.SYSTEM -> speechRecognizer?.startListening(
+                            android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                        )
+                    }
+                    Log.d(TAG, "Listening resumed after TTS")
+                }
+            }, 500)
+        }
+    }
     
     // 冷却时间：防止重复触发
     private var lastCommandTime = 0L
@@ -538,13 +596,21 @@ class VoiceRecognitionService(private val context: Context) {
                         return
                     }
                     
-                    Log.d(TAG, "Executing video call to: ${command.contactName}")
+                    // 将别名/语音识别名解析为微信名，确保用微信名去搜索
+                    val wechatName = settings.matchContactName(command.contactName)
+                    Log.d(TAG, "Executing video call to: wechatName=$wechatName (spoken: ${command.contactName})")
                     lastCommandTime = System.currentTimeMillis()
-                    speakHint("正在给${command.contactName}拨打视频电话")
-                    stopListening()
                     
+                    // 先暂停录音再播报（TTSManager 的 onSpeechStart 会自动暂停）
+                    speakHint("正在给${wechatName}拨打视频电话")
+                    
+                    // 正式停止监听（执行命令后不再恢复）
+                    isListening = false
+                    isPausedForTTS = false
+                    
+                    // 发送广播时用微信名，这样无障碍服务会用微信名在微信中搜索
                     val intent = Intent(EnhancedWeChatAccessibilityService.ACTION_MAKE_VIDEO_CALL).apply {
-                        putExtra(EnhancedWeChatAccessibilityService.EXTRA_CONTACT_NAME, command.contactName)
+                        putExtra(EnhancedWeChatAccessibilityService.EXTRA_CONTACT_NAME, wechatName)
                     }
                     context.sendBroadcast(intent)
                     commandListener?.onCommandExecuted(command)
@@ -566,13 +632,21 @@ class VoiceRecognitionService(private val context: Context) {
                         return
                     }
                     
-                    Log.d(TAG, "Executing voice call to: ${command.contactName}")
+                    // 将别名/语音识别名解析为微信名，确保用微信名去搜索
+                    val wechatName = settings.matchContactName(command.contactName)
+                    Log.d(TAG, "Executing voice call to: wechatName=$wechatName (spoken: ${command.contactName})")
                     lastCommandTime = System.currentTimeMillis()
-                    speakHint("正在给${command.contactName}拨打语音电话")
-                    stopListening()
                     
+                    // 先暂停录音再播报（TTSManager 的 onSpeechStart 会自动暂停）
+                    speakHint("正在给${wechatName}拨打语音电话")
+                    
+                    // 正式停止监听（执行命令后不再恢复）
+                    isListening = false
+                    isPausedForTTS = false
+                    
+                    // 发送广播时用微信名，这样无障碍服务会用微信名在微信中搜索
                     val intent = Intent(EnhancedWeChatAccessibilityService.ACTION_MAKE_VOICE_CALL).apply {
-                        putExtra(EnhancedWeChatAccessibilityService.EXTRA_CONTACT_NAME, command.contactName)
+                        putExtra(EnhancedWeChatAccessibilityService.EXTRA_CONTACT_NAME, wechatName)
                     }
                     context.sendBroadcast(intent)
                     commandListener?.onCommandExecuted(command)
@@ -620,7 +694,42 @@ class VoiceRecognitionService(private val context: Context) {
     
     fun setCommandListener(listener: VoiceCommandListener) {
         commandListener = listener
-        xunfeiService?.setCommandListener(listener)
+        // 包装 listener，拦截讯飞的致命错误以便自动恢复
+        xunfeiService?.setCommandListener(createXunfeiListenerWrapper(listener))
+    }
+    
+    /**
+     * 包装讯飞的 listener，拦截连接失败等致命错误
+     * 当讯飞断开时自动重置 isListening，让引擎切换逻辑可以接管
+     */
+    private fun createXunfeiListenerWrapper(delegate: VoiceCommandListener): VoiceCommandListener {
+        return object : VoiceCommandListener {
+            override fun onCommandRecognized(command: String) = delegate.onCommandRecognized(command)
+            override fun onCommandExecuted(command: VoiceCommandProcessor.Command) = delegate.onCommandExecuted(command)
+            override fun onWakeWordDetected() = delegate.onWakeWordDetected()
+            override fun onWaitingForCommand() = delegate.onWaitingForCommand()
+            override fun onModelDownloadProgress(progress: Int) = delegate.onModelDownloadProgress(progress)
+            override fun onModelReady() = delegate.onModelReady()
+            override fun onError(error: String) {
+                delegate.onError(error)
+                // 讯飞连接失败或授权失败 → 重置 isListening，尝试切换到 Vosk
+                if (error.contains("连接失败") || error.contains("licc failed")) {
+                    Log.w(TAG, "Xunfei fatal error detected: $error, attempting recovery...")
+                    mainHandler.post {
+                        if (isVoskModelReady) {
+                            Log.d(TAG, "Switching to Vosk after Xunfei failure")
+                            currentEngine = Engine.VOSK
+                            isListening = false
+                            startListening()
+                        } else {
+                            // Vosk 也没就绪，重置标志让后续 restartListening 可以重试讯飞
+                            Log.d(TAG, "Vosk not ready, resetting isListening for retry")
+                            isListening = false
+                        }
+                    }
+                }
+            }
+        }
     }
     
     fun destroy() {

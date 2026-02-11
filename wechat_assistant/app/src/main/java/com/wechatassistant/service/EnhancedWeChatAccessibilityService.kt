@@ -3,6 +3,7 @@ package com.wechatassistant.service
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -12,6 +13,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
+import android.text.TextUtils
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
@@ -61,6 +64,31 @@ class EnhancedWeChatAccessibilityService : AccessibilityService() {
             private set
         
         fun isServiceRunning(): Boolean = instance != null
+        
+        /**
+         * 通过系统设置检查无障碍服务是否已启用（更可靠）
+         * 即使 instance 为 null（如 app 刚重装），只要系统设置中已启用就返回 true
+         */
+        fun isServiceEnabled(context: Context): Boolean {
+            // 先检查 instance
+            if (instance != null) return true
+            // 再检查系统设置
+            val expectedName = ComponentName(context, EnhancedWeChatAccessibilityService::class.java).flattenToShortString()
+            val enabledServices = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: return false
+            val colonSplitter = TextUtils.SimpleStringSplitter(':')
+            colonSplitter.setString(enabledServices)
+            while (colonSplitter.hasNext()) {
+                val componentName = colonSplitter.next()
+                if (componentName.equals(expectedName, ignoreCase = true) ||
+                    componentName.equals(ComponentName(context, EnhancedWeChatAccessibilityService::class.java).flattenToString(), ignoreCase = true)) {
+                    return true
+                }
+            }
+            return false
+        }
     }
     
     private lateinit var settings: SettingsManager

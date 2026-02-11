@@ -112,7 +112,7 @@ class SettingsActivity : AppCompatActivity() {
         val tvNotificationStatus = findViewById<TextView>(R.id.tvNotificationStatus)
         val tvOverlayStatus = findViewById<TextView>(R.id.tvOverlayStatus)
 
-        val isAccessibilityEnabled = EnhancedWeChatAccessibilityService.isServiceRunning()
+        val isAccessibilityEnabled = EnhancedWeChatAccessibilityService.isServiceEnabled(this)
         val isNotificationEnabled = isNotificationListenerEnabled()
         val isOverlayEnabled = Settings.canDrawOverlays(this)
 

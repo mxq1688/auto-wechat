@@ -25,6 +25,7 @@ import com.wechatassistant.service.CallNotificationListenerService
 import com.wechatassistant.service.EnhancedWeChatAccessibilityService
 import com.wechatassistant.service.FloatingBallService
 import com.wechatassistant.service.VoiceRecognitionService
+import com.wechatassistant.service.VoiceListeningForegroundService
 import com.wechatassistant.ui.VideoCallActivity
 import com.wechatassistant.voice.VoiceCommandProcessor
 
@@ -43,6 +44,20 @@ class MainActivity : AppCompatActivity() {
     
     private lateinit var settings: SettingsManager
     private var voiceRecognitionService: VoiceRecognitionService? = null
+
+    // 接收前台服务的语音状态更新
+    private val voiceServiceReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == VoiceListeningForegroundService.ACTION_VOICE_STATUS_UPDATE) {
+                val text = intent.getStringExtra(VoiceListeningForegroundService.EXTRA_STATUS_TEXT) ?: return
+                val color = intent.getIntExtra(VoiceListeningForegroundService.EXTRA_STATUS_COLOR, 0xFF9E9E9E.toInt())
+                runOnUiThread {
+                    voiceStatusText.text = text
+                    voiceStatusText.setTextColor(color)
+                }
+            }
+        }
+    }
     
     // Views
     private lateinit var statusText: TextView
@@ -226,6 +241,10 @@ class MainActivity : AppCompatActivity() {
             addAction(EnhancedWeChatAccessibilityService.ACTION_NEW_MESSAGE)
         }
         registerReceiver(serviceReceiver, filter, RECEIVER_NOT_EXPORTED)
+
+        // 注册语音前台服务状态广播
+        val voiceFilter = IntentFilter(VoiceListeningForegroundService.ACTION_VOICE_STATUS_UPDATE)
+        registerReceiver(voiceServiceReceiver, voiceFilter, RECEIVER_NOT_EXPORTED)
     }
     
     override fun onResume() {
@@ -233,9 +252,16 @@ class MainActivity : AppCompatActivity() {
         updateStatus()
         // 刷新联系人列表
         loadContactList()
-        // 返回界面时恢复语音识别
-        if (isVoiceControlEnabled) {
-            restartListeningIfEnabled()
+        // 恢复界面时同步前台服务状态到开关
+        val serviceRunning = VoiceListeningForegroundService.isServiceRunning
+        if (serviceRunning && !switchVoiceControl.isChecked) {
+            switchVoiceControl.setOnCheckedChangeListener(null)
+            switchVoiceControl.isChecked = true
+            isVoiceControlEnabled = true
+            updateVoiceSwitchStyle(true)
+            voiceStatusText.text = "🎤 语音监听中，说「给XXX打电话」"
+            voiceStatusText.setTextColor(0xFF4CAF50.toInt())
+            switchVoiceControl.setOnCheckedChangeListener { _, isChecked -> toggleVoiceControl(isChecked) }
         }
     }
     
@@ -250,8 +276,8 @@ class MainActivity : AppCompatActivity() {
         val isFloatingBallRunning = FloatingBallService.instance != null
         startFloatingBallButton.text = if (isFloatingBallRunning) "关闭悬浮球" else "启动悬浮球"
         
-        // 更新无障碍服务状态
-        val isAccessibilityEnabled = EnhancedWeChatAccessibilityService.isServiceRunning()
+        // 更新无障碍服务状态（用系统设置检查，更可靠）
+        val isAccessibilityEnabled = EnhancedWeChatAccessibilityService.isServiceEnabled(this)
         updateAccessibilityStatus(isAccessibilityEnabled)
         
         // 更新通知监听服务状态
@@ -494,80 +520,30 @@ class MainActivity : AppCompatActivity() {
     private var isVoiceControlEnabled = false
     
     private fun setupVoiceRecognition() {
-        // 初始化语音识别服务
-        voiceRecognitionService = VoiceRecognitionService(this)
-        voiceRecognitionService?.requireWakeWord = false  // 不需要唤醒词，直接说命令
-        
-        voiceRecognitionService?.setCommandListener(object : VoiceRecognitionService.VoiceCommandListener {
-            override fun onCommandRecognized(command: String) {
-                runOnUiThread {
-                    voiceStatusText.text = "🎤 识别中..."
-                    voiceStatusText.setTextColor(0xFF2196F3.toInt())
-                }
-                // 继续监听
-                restartListeningIfEnabled()
+        // 语音识别现在由 VoiceListeningForegroundService 管理
+        // 这里只恢复持久化的开关状态
+        val savedState = settings.voiceRecognitionEnabled
+        if (savedState || VoiceListeningForegroundService.isServiceRunning) {
+            // 恢复开关状态（不触发 listener）
+            switchVoiceControl.setOnCheckedChangeListener(null)
+            switchVoiceControl.isChecked = true
+            isVoiceControlEnabled = true
+            updateVoiceSwitchStyle(true)
+            voiceStatusText.text = "🎤 语音监听中，说「给XXX打电话」"
+            voiceStatusText.setTextColor(0xFF4CAF50.toInt())
+            switchVoiceControl.setOnCheckedChangeListener { _, isChecked -> toggleVoiceControl(isChecked) }
+
+            // 确保前台服务在运行
+            if (!VoiceListeningForegroundService.isServiceRunning) {
+                startVoiceForegroundService()
             }
-            
-            override fun onCommandExecuted(command: VoiceCommandProcessor.Command) {
-                runOnUiThread {
-                    val contactName = command.contactName ?: return@runOnUiThread
-                    val callType = if (command.type == VoiceCommandProcessor.CommandType.VIDEO_CALL) "视频" else "语音"
-                    voiceStatusText.text = "📞 拨打${contactName}..."
-                    voiceStatusText.setTextColor(0xFF4CAF50.toInt())
-                    
-                    // 执行打电话！
-                    val isVideo = command.type == VoiceCommandProcessor.CommandType.VIDEO_CALL
-                    makeCall(contactName, isVideo)
-                }
-            }
-            
-            override fun onError(error: String) {
-                runOnUiThread {
-                    // 忽略"未识别到语音"错误，继续监听
-                    if (!error.contains("未识别") && !error.contains("超时")) {
-                        voiceStatusText.text = "⚠️ 出错"
-                        voiceStatusText.setTextColor(0xFFFF9800.toInt())
-                    }
-                }
-                // 继续监听
-                restartListeningIfEnabled()
-            }
-            
-            override fun onWakeWordDetected() {
-                runOnUiThread {
-                    voiceStatusText.text = "✨ 在听..."
-                    voiceStatusText.setTextColor(0xFF4CAF50.toInt())
-                }
-            }
-            
-            override fun onWaitingForCommand() {
-                runOnUiThread {
-                    voiceStatusText.text = "✨ 请说命令..."
-                    voiceStatusText.setTextColor(0xFF4CAF50.toInt())
-                }
-                // 继续监听等待命令
-                restartListeningIfEnabled()
-            }
-            
-            override fun onModelDownloadProgress(progress: Int) {
-                runOnUiThread {
-                    voiceStatusText.text = "📥 下载: $progress%"
-                    voiceStatusText.setTextColor(0xFFFF9800.toInt())
-                }
-            }
-            
-            override fun onModelReady() {
-                runOnUiThread {
-                    voiceStatusText.text = "✅ 就绪"
-                    voiceStatusText.setTextColor(0xFF4CAF50.toInt())
-                }
-            }
-        })
+        }
     }
     
     private fun toggleVoiceControl(enabled: Boolean) {
         android.util.Log.d("MainActivity", "toggleVoiceControl: $enabled")
         isVoiceControlEnabled = enabled
+        settings.voiceRecognitionEnabled = enabled  // 持久化状态
         
         // 更新开关颜色
         updateVoiceSwitchStyle(enabled)
@@ -577,33 +553,29 @@ class MainActivity : AppCompatActivity() {
             if (!checkAudioPermission()) {
                 android.util.Log.e("MainActivity", "Audio permission not granted!")
                 switchVoiceControl.isChecked = false
+                settings.voiceRecognitionEnabled = false
                 return
             }
             
-            // 检查无障碍服务
-            if (!EnhancedWeChatAccessibilityService.isServiceRunning()) {
-                android.util.Log.e("MainActivity", "Accessibility service not running!")
+            // 检查无障碍服务（用系统设置检查，更可靠）
+            if (!EnhancedWeChatAccessibilityService.isServiceEnabled(this)) {
+                android.util.Log.e("MainActivity", "Accessibility service not enabled!")
                 showToast("需要先启用无障碍服务")
                 switchVoiceControl.isChecked = false
+                settings.voiceRecognitionEnabled = false
                 showSettingsDialog()  // 直接打开设置
                 return
             }
             
-            android.util.Log.d("MainActivity", "Starting voice recognition...")
+            // 启动前台服务
+            startVoiceForegroundService()
             voiceStatusText.text = "🎤 语音监听中，说「给XXX打电话」"
             voiceStatusText.setTextColor(0xFF4CAF50.toInt())
-            
-            if (voiceRecognitionService != null) {
-                voiceRecognitionService?.startListening()
-                android.util.Log.d("MainActivity", "Voice recognition started")
-            } else {
-                android.util.Log.e("MainActivity", "voiceRecognitionService is NULL!")
-                showToast("语音服务初始化失败")
-            }
         } else {
+            // 停止前台服务
+            stopVoiceForegroundService()
             voiceStatusText.text = "⏸️ 语音控制已关闭"
             voiceStatusText.setTextColor(0xFF9E9E9E.toInt())
-            voiceRecognitionService?.stopListening()
         }
     }
     
@@ -622,19 +594,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun restartListeningIfEnabled() {
-        if (isVoiceControlEnabled) {
-            // 延迟一小段时间后重新开始监听
-            window.decorView.postDelayed({
-                if (isVoiceControlEnabled) {
-                    runOnUiThread {
-                        voiceStatusText.text = "🎤 说「给XXX打电话」"
-                        voiceStatusText.setTextColor(0xFF4CAF50.toInt())
-                    }
-                    voiceRecognitionService?.startListening()
-                }
-            }, 1000)
+    private fun startVoiceForegroundService() {
+        val serviceIntent = Intent(this, VoiceListeningForegroundService::class.java).apply {
+            action = "START"
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+        android.util.Log.d("MainActivity", "VoiceListeningForegroundService started")
+    }
+
+    private fun stopVoiceForegroundService() {
+        val serviceIntent = Intent(this, VoiceListeningForegroundService::class.java).apply {
+            action = "STOP"
+        }
+        startService(serviceIntent)
+        android.util.Log.d("MainActivity", "VoiceListeningForegroundService stopped")
     }
     
     private fun checkAudioPermission(): Boolean {
@@ -831,18 +808,17 @@ class MainActivity : AppCompatActivity() {
     
     override fun onPause() {
         super.onPause()
-        // 离开界面时暂停语音识别
-        if (isVoiceControlEnabled) {
-            voiceRecognitionService?.stopListening()
-        }
+        // 前台服务独立运行，不在此停止
     }
     
     override fun onDestroy() {
-        isVoiceControlEnabled = false
-        voiceRecognitionService?.destroy()
+        // 前台服务独立运行，不销毁。只注销广播。
         super.onDestroy()
         try {
             unregisterReceiver(serviceReceiver)
+        } catch (e: Exception) {}
+        try {
+            unregisterReceiver(voiceServiceReceiver)
         } catch (e: Exception) {}
     }
     

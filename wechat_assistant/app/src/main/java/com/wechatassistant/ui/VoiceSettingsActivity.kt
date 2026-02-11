@@ -11,7 +11,12 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.content.res.ColorStateList
+import android.graphics.Outline
+import android.util.TypedValue
 import android.view.Gravity
+import android.view.View
+import android.view.ViewOutlineProvider
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -19,6 +24,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import com.wechatassistant.R
 import com.wechatassistant.manager.SettingsManager
 import java.io.File
@@ -31,6 +39,7 @@ class VoiceSettingsActivity : AppCompatActivity() {
     // 数据
     private val contactsMap = mutableMapOf<String, MutableList<String>>()
     private val contactPhotos = mutableMapOf<String, String>()
+    private val expandedContacts = mutableSetOf<String>()  // 记住展开的联系人
     private val wakeWordList = mutableListOf<String>()
     private val videoKeywordList = mutableListOf<String>()
     private val voiceKeywordList = mutableListOf<String>()
@@ -172,6 +181,32 @@ class VoiceSettingsActivity : AppCompatActivity() {
             finish()
         }
         
+        // 唤醒词折叠/展开
+        val wakeWordContent = findViewById<LinearLayout>(R.id.wakeWordContent)
+        val wakeWordArrow = findViewById<TextView>(R.id.wakeWordArrow)
+        findViewById<LinearLayout>(R.id.wakeWordHeader).setOnClickListener {
+            if (wakeWordContent.visibility == View.VISIBLE) {
+                wakeWordContent.visibility = View.GONE
+                wakeWordArrow.text = "▼"
+            } else {
+                wakeWordContent.visibility = View.VISIBLE
+                wakeWordArrow.text = "▲"
+            }
+        }
+        
+        // 通话关键词折叠/展开
+        val callKeywordContent = findViewById<LinearLayout>(R.id.callKeywordContent)
+        val callKeywordArrow = findViewById<TextView>(R.id.callKeywordArrow)
+        findViewById<LinearLayout>(R.id.callKeywordHeader).setOnClickListener {
+            if (callKeywordContent.visibility == View.VISIBLE) {
+                callKeywordContent.visibility = View.GONE
+                callKeywordArrow.text = "▼"
+            } else {
+                callKeywordContent.visibility = View.VISIBLE
+                callKeywordArrow.text = "▲"
+            }
+        }
+        
         // 添加联系人
         findViewById<Button>(R.id.btnAddContact).setOnClickListener {
             val editName = findViewById<EditText>(R.id.editNewWechatName)
@@ -191,7 +226,7 @@ class VoiceSettingsActivity : AppCompatActivity() {
             val word = editWord.text.toString().trim()
             if (word.isNotEmpty() && !wakeWordList.contains(word)) {
                 wakeWordList.add(word)
-                addTag(wakeWordListContainer, wakeWordList, word, 0xFFFF9800.toInt())
+                refreshTagList(wakeWordListContainer, wakeWordList, 0xFFFF9800.toInt())
                 editWord.text.clear()
             }
         }
@@ -202,7 +237,7 @@ class VoiceSettingsActivity : AppCompatActivity() {
             val word = editWord.text.toString().trim()
             if (word.isNotEmpty() && !videoKeywordList.contains(word)) {
                 videoKeywordList.add(word)
-                addTag(videoKeywordListContainer, videoKeywordList, word, 0xFF2196F3.toInt())
+                refreshTagList(videoKeywordListContainer, videoKeywordList, 0xFF2196F3.toInt())
                 editWord.text.clear()
             }
         }
@@ -213,7 +248,7 @@ class VoiceSettingsActivity : AppCompatActivity() {
             val word = editWord.text.toString().trim()
             if (word.isNotEmpty() && !voiceKeywordList.contains(word)) {
                 voiceKeywordList.add(word)
-                addTag(voiceKeywordListContainer, voiceKeywordList, word, 0xFF4CAF50.toInt())
+                refreshTagList(voiceKeywordListContainer, voiceKeywordList, 0xFF4CAF50.toInt())
                 editWord.text.clear()
             }
         }
@@ -224,7 +259,7 @@ class VoiceSettingsActivity : AppCompatActivity() {
             val word = editWord.text.toString().trim()
             if (word.isNotEmpty() && !generalKeywordList.contains(word)) {
                 generalKeywordList.add(word)
-                addTag(generalKeywordListContainer, generalKeywordList, word, 0xFFFF9800.toInt())
+                refreshTagList(generalKeywordListContainer, generalKeywordList, 0xFFFF9800.toInt())
                 editWord.text.clear()
             }
         }
@@ -261,104 +296,219 @@ class VoiceSettingsActivity : AppCompatActivity() {
         settings.llmApiKey = editLLMApiKey.text.toString().trim()
     }
     
+    /** dp -> px */
+    private fun dp(value: Int): Int {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), resources.displayMetrics
+        ).toInt()
+    }
+
     private fun refreshContactList() {
         contactListContainer.removeAllViews()
-        
+
         if (contactsMap.isEmpty()) {
-            val emptyView = TextView(this).apply {
-                text = "暂无联系人，请在下方添加"
-                textSize = 14f
-                setTextColor(0xFF999999.toInt())
-                setPadding(0, 16, 0, 16)
+            // 空状态
+            val emptyLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                setPadding(0, dp(24), 0, dp(24))
             }
-            contactListContainer.addView(emptyView)
+            val emptyIcon = TextView(this).apply {
+                text = "👤"
+                textSize = 36f
+                gravity = Gravity.CENTER
+            }
+            val emptyText = TextView(this).apply {
+                text = "暂无联系人\n请在下方添加微信好友"
+                textSize = 14f
+                setTextColor(0xFF9E9E9E.toInt())
+                gravity = Gravity.CENTER
+                setLineSpacing(dp(4).toFloat(), 1f)
+            }
+            emptyLayout.addView(emptyIcon)
+            emptyLayout.addView(emptyText)
+            contactListContainer.addView(emptyLayout)
             return
         }
-        
+
         contactsMap.forEach { (wechatName, aliases) ->
-            // 联系人卡片
-            val cardView = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setBackgroundColor(0xFFF5F5F5.toInt())
-                setPadding(16, 12, 16, 12)
+            // ===== MaterialCardView 卡片 =====
+            val card = MaterialCardView(this).apply {
+                radius = dp(14).toFloat()
+                cardElevation = dp(3).toFloat()
+                setCardBackgroundColor(0xFFFFFFFF.toInt())
+                strokeWidth = dp(1)
+                strokeColor = 0xFFEEEEEE.toInt()
+                useCompatPadding = true
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = 12 }
+                ).apply { bottomMargin = dp(6) }
             }
-            
-            // 头部：照片 + 微信名 + 删除按钮
+
+            val cardContent = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(16), dp(14), dp(16), dp(14))
+            }
+
+            // ===== 头部：圆形照片 + 微信名 + 删除按钮 =====
             val headerRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
             }
-            
-            // 联系人照片
+
+            // 联系人照片（圆形）
+            val photoSize = dp(52)
             val photoView = ImageView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(64, 64).apply { marginEnd = 12 }
+                layoutParams = LinearLayout.LayoutParams(photoSize, photoSize).apply {
+                    marginEnd = dp(14)
+                }
                 scaleType = ImageView.ScaleType.CENTER_CROP
-                setBackgroundColor(0xFFE0E0E0.toInt())
-                
+
+                // 圆形裁剪
+                outlineProvider = object : ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: Outline) {
+                        outline.setOval(0, 0, view.width, view.height)
+                    }
+                }
+                clipToOutline = true
+
                 val photoPath = contactPhotos[wechatName]
                 if (photoPath != null && File(photoPath).exists()) {
                     val bitmap = BitmapFactory.decodeFile(photoPath)
                     setImageBitmap(bitmap)
+                    setBackgroundResource(R.drawable.bg_photo_placeholder)
                 } else {
+                    setBackgroundResource(R.drawable.bg_photo_placeholder)
                     setImageResource(android.R.drawable.ic_menu_camera)
+                    imageTintList = ColorStateList.valueOf(0xFF90CAF9.toInt())
+                    setPadding(dp(12), dp(12), dp(12), dp(12))
                 }
-                
-                setOnClickListener {
-                    showPhotoOptionsDialog(wechatName)
-                }
+
+                setOnClickListener { showPhotoOptionsDialog(wechatName) }
             }
-            
-            val nameView = TextView(this).apply {
-                text = "📱 $wechatName"
-                textSize = 16f
-                setTextColor(0xFF1976D2.toInt())
-                setTypeface(null, Typeface.BOLD)
+
+            // 名字列
+            val nameColumn = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
-            
-            val deleteContactBtn = TextView(this).apply {
-                text = "删除"
-                textSize = 13f
-                setTextColor(0xFFE53935.toInt())
-                setPadding(16, 8, 0, 8)
+            val nameView = TextView(this).apply {
+                text = wechatName
+                textSize = 17f
+                setTextColor(0xFF212121.toInt())
+                setTypeface(null, Typeface.BOLD)
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            }
+            val subtitleView = TextView(this).apply {
+                text = "微信名 · ${aliases.size}个简称"
+                textSize = 12f
+                setTextColor(0xFFBDBDBD.toInt())
+                setPadding(0, dp(2), 0, 0)
+            }
+            nameColumn.addView(nameView)
+            nameColumn.addView(subtitleView)
+
+            // 删除按钮
+            val deleteBtnSize = dp(34)
+            val deleteBtn = ImageView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(deleteBtnSize, deleteBtnSize)
+                setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+                imageTintList = ColorStateList.valueOf(0xFFBDBDBD.toInt())
+                setPadding(dp(7), dp(7), dp(7), dp(7))
+                // 获取 ripple 背景
+                val outValue = TypedValue()
+                context.theme.resolveAttribute(
+                    android.R.attr.selectableItemBackgroundBorderless, outValue, true
+                )
+                setBackgroundResource(outValue.resourceId)
                 setOnClickListener {
-                    contactsMap.remove(wechatName)
-                    settings.removeContactPhoto(wechatName)
-                    contactPhotos.remove(wechatName)
-                    refreshContactList()
+                    AlertDialog.Builder(this@VoiceSettingsActivity)
+                        .setTitle("删除联系人")
+                        .setMessage("确定要删除「$wechatName」及其所有简称吗？")
+                        .setPositiveButton("删除") { _, _ ->
+                            contactsMap.remove(wechatName)
+                            settings.removeContactPhoto(wechatName)
+                            contactPhotos.remove(wechatName)
+                            refreshContactList()
+                        }
+                        .setNegativeButton("取消", null)
+                        .show()
                 }
             }
-            
+
+            // 展开/收起箭头
+            val isExpanded = expandedContacts.contains(wechatName)
+            val arrowView = TextView(this).apply {
+                text = if (isExpanded) "▲" else "▼"
+                textSize = 12f
+                setTextColor(0xFFBDBDBD.toInt())
+                setPadding(dp(6), 0, 0, 0)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+
             headerRow.addView(photoView)
-            headerRow.addView(nameView)
-            headerRow.addView(deleteContactBtn)
-            cardView.addView(headerRow)
-            
-            // 简称标签区域
-            val aliasContainer = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
+            headerRow.addView(nameColumn)
+            headerRow.addView(arrowView)
+            headerRow.addView(deleteBtn)
+            cardContent.addView(headerRow)
+
+            // ===== 可折叠详情区 =====
+            val detailSection = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                visibility = if (isExpanded) View.VISIBLE else View.GONE
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = 8 }
+                )
             }
-            
+
+            // 分割线
+            val divider = View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
+                ).apply { topMargin = dp(10); bottomMargin = dp(8) }
+                setBackgroundColor(0xFFF5F5F5.toInt())
+            }
+            detailSection.addView(divider)
+
+            // 简称标签（ChipGroup 自动换行）
+            val aliasLabel = TextView(this).apply {
+                text = "简称"
+                textSize = 12f
+                setTextColor(0xFF9E9E9E.toInt())
+                setPadding(0, 0, 0, dp(4))
+            }
+            detailSection.addView(aliasLabel)
+
+            val chipGroup = ChipGroup(this).apply {
+                chipSpacingHorizontal = dp(4)
+                chipSpacingVertical = dp(2)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
             aliases.forEach { alias ->
-                val tag = TextView(this).apply {
-                    text = "  $alias  ×"
-                    textSize = 13f
-                    setTextColor(0xFFFFFFFF.toInt())
-                    setBackgroundColor(0xFF42A5F5.toInt())
-                    setPadding(12, 6, 12, 6)
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply { marginEnd = 8 }
-                    setOnClickListener {
+                val chip = Chip(this).apply {
+                    text = alias
+                    textSize = 12f
+                    isCloseIconVisible = true
+                    chipBackgroundColor = ColorStateList.valueOf(0xFFE3F2FD.toInt())
+                    setTextColor(0xFF1565C0.toInt())
+                    closeIconTint = ColorStateList.valueOf(0xFF90CAF9.toInt())
+                    chipStrokeWidth = dp(1).toFloat()
+                    chipStrokeColor = ColorStateList.valueOf(0xFFBBDEFB.toInt())
+                    chipCornerRadius = dp(12).toFloat()
+                    chipMinHeight = dp(28).toFloat()
+                    chipStartPadding = dp(6).toFloat()
+                    chipEndPadding = dp(2).toFloat()
+                    closeIconSize = dp(14).toFloat()
+                    setOnCloseIconClickListener {
                         aliases.remove(alias)
                         if (aliases.isEmpty()) {
                             contactsMap.remove(wechatName)
@@ -366,74 +516,121 @@ class VoiceSettingsActivity : AppCompatActivity() {
                         refreshContactList()
                     }
                 }
-                aliasContainer.addView(tag)
+                chipGroup.addView(chip)
             }
-            
-            cardView.addView(aliasContainer)
-            
-            // 添加简称输入区
+            detailSection.addView(chipGroup)
+
+            // 添加简称输入
             val addAliasRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
+                clipChildren = false
+                clipToPadding = false
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = 8 }
+                ).apply { topMargin = dp(8) }
             }
-            
+
             val aliasInput = EditText(this).apply {
-                hint = "添加简称..."
+                hint = "添加新简称…"
                 textSize = 14f
-                setPadding(12, 8, 12, 8)
+                setPadding(dp(14), dp(10), dp(14), dp(10))
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                setBackgroundColor(0xFFFFFFFF.toInt())
+                setBackgroundResource(R.drawable.bg_alias_input)
+                setHintTextColor(0xFFBDBDBD.toInt())
+                isSingleLine = true
             }
-            
+
             val addAliasBtn = TextView(this).apply {
-                text = " +添加 "
+                text = "+ 添加"
                 textSize = 13f
-                setTextColor(0xFF4CAF50.toInt())
-                setPadding(16, 8, 8, 8)
+                setTextColor(0xFFFFFFFF.toInt())
+                setBackgroundResource(R.drawable.bg_alias_add_btn)
+                setPadding(dp(16), dp(9), dp(16), dp(9))
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginStart = dp(8) }
                 setOnClickListener {
                     val newAlias = aliasInput.text.toString().trim()
                     if (newAlias.isNotEmpty() && !aliases.contains(newAlias)) {
                         aliases.add(newAlias)
+                        expandedContacts.add(wechatName) // 保持展开
                         aliasInput.text.clear()
                         refreshContactList()
+                    } else if (newAlias.isEmpty()) {
+                        Toast.makeText(this@VoiceSettingsActivity, "请输入简称", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
-            
+
             addAliasRow.addView(aliasInput)
             addAliasRow.addView(addAliasBtn)
-            cardView.addView(addAliasRow)
-            
-            contactListContainer.addView(cardView)
+            detailSection.addView(addAliasRow)
+
+            cardContent.addView(detailSection)
+
+            // 点击头部切换展开/收起
+            headerRow.setOnClickListener {
+                if (expandedContacts.contains(wechatName)) {
+                    expandedContacts.remove(wechatName)
+                    arrowView.text = "▼"
+                    detailSection.visibility = View.GONE
+                } else {
+                    expandedContacts.add(wechatName)
+                    arrowView.text = "▲"
+                    detailSection.visibility = View.VISIBLE
+                }
+            }
+
+            card.addView(cardContent)
+            contactListContainer.addView(card)
         }
     }
     
+    /** 把 0xAARRGGBB 的颜色变浅 (factor 0~1, 越大越浅) */
+    private fun lightenColor(color: Int, factor: Float): Int {
+        val r = ((color shr 16 and 0xFF) + ((255 - (color shr 16 and 0xFF)) * factor)).toInt().coerceIn(0, 255)
+        val g = ((color shr 8 and 0xFF) + ((255 - (color shr 8 and 0xFF)) * factor)).toInt().coerceIn(0, 255)
+        val b = ((color and 0xFF) + ((255 - (color and 0xFF)) * factor)).toInt().coerceIn(0, 255)
+        return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+    }
+
     private fun refreshTagList(container: LinearLayout, list: MutableList<String>, bgColor: Int) {
         container.removeAllViews()
-        list.forEach { addTag(container, list, it, bgColor) }
-    }
-    
-    private fun addTag(container: LinearLayout, list: MutableList<String>, text: String, bgColor: Int) {
-        val tag = TextView(this).apply {
-            this.text = "  $text  ×"
-            textSize = 13f
-            setTextColor(0xFFFFFFFF.toInt())
-            setBackgroundColor(bgColor)
-            setPadding(14, 8, 14, 8)
+
+        val chipGroup = ChipGroup(this).apply {
+            chipSpacingHorizontal = dp(6)
+            chipSpacingVertical = dp(4)
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { marginEnd = 8; bottomMargin = 4 }
-            setOnClickListener {
-                list.remove(text)
-                container.removeView(this)
-            }
+            )
         }
-        container.addView(tag)
+
+        list.forEach { text ->
+            val chip = Chip(this).apply {
+                this.text = text
+                textSize = 13f
+                isCloseIconVisible = true
+                chipBackgroundColor = ColorStateList.valueOf(lightenColor(bgColor, 0.82f))
+                setTextColor(bgColor)
+                closeIconTint = ColorStateList.valueOf(lightenColor(bgColor, 0.4f))
+                chipStrokeWidth = dp(1).toFloat()
+                chipStrokeColor = ColorStateList.valueOf(lightenColor(bgColor, 0.6f))
+                chipCornerRadius = dp(16).toFloat()
+                chipMinHeight = dp(32).toFloat()
+                setOnCloseIconClickListener {
+                    list.remove(text)
+                    refreshTagList(container, list, bgColor)
+                }
+            }
+            chipGroup.addView(chip)
+        }
+
+        container.addView(chipGroup)
     }
     
     // ==================== 照片相关方法 ====================
